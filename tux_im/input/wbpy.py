@@ -131,7 +131,10 @@ class WbpyMode:
         if not self.buffer:
             return None
         cands = self.candidates(limit=1)
-        return cands[0].text if cands else None
+        if cands:
+            return cands[0].text
+        # Last resort: commit the raw buffer so the user doesn't lose input.
+        return self.buffer
 
     # ---- Heuristics ----
 

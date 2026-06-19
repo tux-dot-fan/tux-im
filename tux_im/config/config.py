@@ -29,6 +29,15 @@ class ShortcutSection:
     toggle_en_cn: str = "Caps_Lock"
     start_asr: str = "<Ctrl>grave"
     commit_first: str = "space"
+    candidate_1: str = "1"
+    candidate_2: str = "2"
+    candidate_3: str = "3"
+    candidate_4: str = "4"
+    candidate_5: str = "5"
+    candidate_6: str = "6"
+    candidate_7: str = "7"
+    candidate_8: str = "8"
+    candidate_9: str = "9"
     page_up: str = "bracketleft"
     page_down: str = "bracketright"
     cycle_mode: str = "<Ctrl><Shift>m"
@@ -43,6 +52,15 @@ class ShortcutSection:
             "toggle_en_cn": self.toggle_en_cn,
             "start_asr": self.start_asr,
             "commit_first": self.commit_first,
+            "candidate_1": self.candidate_1,
+            "candidate_2": self.candidate_2,
+            "candidate_3": self.candidate_3,
+            "candidate_4": self.candidate_4,
+            "candidate_5": self.candidate_5,
+            "candidate_6": self.candidate_6,
+            "candidate_7": self.candidate_7,
+            "candidate_8": self.candidate_8,
+            "candidate_9": self.candidate_9,
             "page_up": self.page_up,
             "page_down": self.page_down,
             "cycle_mode": self.cycle_mode,

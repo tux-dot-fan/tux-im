@@ -45,17 +45,21 @@ class PinyinMode:
         if key is None:
             return None
         ch = key.lower()
+        log.debug("PinyinMode.feed_key: keyval=%d key=%r ch=%r buffer_before=%r",
+                  keyval, key, ch, self.buffer)
 
         # Digit tone
         if ch in _TONE_KEYS and self.buffer and self.buffer[-1].isalpha():
             self.buffer += ch
             self.cursor = len(self.buffer)
+            log.debug("PinyinMode.feed_key: tone digit, buffer=%r", self.buffer)
             return KeyResult(handled=True)
 
         # Letter
         if len(ch) == 1 and ch in _PINYIN_KEYS:
             self.buffer += ch
             self.cursor = len(self.buffer)
+            log.debug("PinyinMode.feed_key: letter, buffer=%r", self.buffer)
             return KeyResult(handled=True)
 
         return None
@@ -80,11 +84,18 @@ class PinyinMode:
     def commit(self) -> Optional[str]:
         if not self.buffer:
             return None
-        # Default commit: first candidate, or raw pinyin if no match.
+        # First try to look up the buffer as a complete pinyin code.
         entries = self._trie.lookup(self.buffer)
         if entries:
             return entries[0].word
-        return None
+        # Fallback: strip trailing tone digit and try again so "ni3" → "你".
+        buf = self.buffer
+        if len(buf) > 1 and buf[-1].isdigit():
+            entries = self._trie.lookup(buf[:-1])
+            if entries:
+                return entries[0].word
+        # Last resort: commit the raw buffer so the user doesn't lose input.
+        return self.buffer
 
 
 def _entry_to_candidate(e: LexEntry) -> Candidate:

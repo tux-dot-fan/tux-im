@@ -71,4 +71,7 @@ class WubiMode:
         if not self.buffer:
             return None
         entries = self._trie.lookup(self.buffer)
-        return entries[0].word if entries else None
+        if entries:
+            return entries[0].word
+        # Last resort: commit the raw wubi code so the user doesn't lose input.
+        return self.buffer
