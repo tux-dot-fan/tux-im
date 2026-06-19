@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=TUX IM Settings
+GenericName=Input Method Settings
+Comment=Configure TUX IM
+Exec=tux-im-setup
+Icon=input-keyboard
+Terminal=false
+Categories=Settings;Keyboard;
+StartupNotify=true

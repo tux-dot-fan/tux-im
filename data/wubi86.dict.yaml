@@ -1,0 +1,33 @@
+# Sample Wubi 86 dict in RIME format
+# Format: <chinese_word>\t<wubi_code>
+# Wubi 86 codes are 1-4 letters
+# First letter = first stroke category, etc.
+我	trny
+你	wqiy
+是	jjgh
+的	yqyy
+人	wwww
+有	defd
+他	wbn
+她	vbn
+它	pxxn
+们	wu
+这	yps
+那	vfb
+中	khk
+国	lgyd
+北京	uxyq
+上海	hiyq
+广州	yyuq
+深圳	ftkq
+今天	wtgd
+明天	judd
+昨天	jfgd
+谢谢	nfty
+再见	gmhq
+不	gsi
+好	nvb
+吃	ktnx
+喝	kjqy
+说	yukq
+话	ytdd

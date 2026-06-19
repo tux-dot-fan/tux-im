@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tux-im"
+version = "0.1.0"
+description = "TUX IM — IBus input method engine for Pinyin, Wubi, Wbpy, and ASR"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "GPL-3.0-or-later" }
+authors = [{ name = "TUX IM contributors" }]
+keywords = ["ibus", "input-method", "pinyin", "wubi", "chinese", "asr"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: X11 Applications",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Text Processing :: Linguistic",
+]
+dependencies = [
+    "PyGObject>=3.42",
+    "httpx>=0.25",
+    "sounddevice>=0.4.6",
+    "tomli>=2.0; python_version < '3.11'",
+    "tomli-w>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.21",
+    "pytest-cov>=4.1",
+    "ruff>=0.1",
+    "mypy>=1.7",
+    "respx>=0.21",
+]
+
+[project.scripts]
+ibus-engine-tux-im = "tux_im.main:main"
+tux-im-setup = "tux_im.ui.settings:main"
+
+[project.urls]
+Homepage = "https://github.com/tux-im/tux-im"
+Documentation = "https://github.com/tux-im/tux-im/tree/main/docs"
+Issues = "https://github.com/tux-im/tux-im/issues"
+
+[tool.setuptools]
+packages = ["tux_im", "tux_im.input", "tux_im.asr", "tux_im.ui", "tux_im.config"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+tux_im = ["py.typed"]
+
+[tool.setuptools.data-files]
+"share/ibus/component" = ["setup/com.github.tux-im.TuxIM.xml"]
+"share/dbus-1/services" = ["setup/com.github.tux-im.TuxIM.service"]
+"libexec" = ["setup/ibus-engine-tux-im"]
+"share/applications" = ["setup/tux-im-setup.desktop"]
+"share/tux-im" = ["data/*.yaml"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "PT", "RUF"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+addopts = "-v --tb=short"

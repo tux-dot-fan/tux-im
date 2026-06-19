@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+  <name>org.freedesktop.IBus.TuxIM</name>
+  <description>TUX IM Input Method (Pinyin, Wubi, Wbpy, ASR)</description>
+  <author>TUX IM contributors</author>
+  <homepage>https://github.com/tux-im/tux-im</homepage>
+  <license>GPL-3.0-or-later</license>
+  <exec>/usr/bin/ibus-engine-tux-im --ibus</exec>
+  <textdomain>tux-im</textdomain>
+  <engines>
+    <engine>
+      <name>tux-im</name>
+      <longname>TUX IM</longname>
+      <description>Pinyin, Wubi, Wbpy, ASR</description>
+      <language>zh_CN</language>
+      <icon>input-keyboard</icon>
+      <setup>/usr/bin/tux-im-setup</setup>
+      <layout>default</layout>
+    </engine>
+  </engines>
+</component>

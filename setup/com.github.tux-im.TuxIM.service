@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.freedesktop.IBus.TuxIM
+Exec=/usr/bin/ibus-engine-tux-im --ibus

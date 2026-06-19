@@ -1,0 +1,22 @@
+# Sample pinyin dict in RIME format
+# Format: <chinese_word>\t<pinyin_with_tone_numbers>
+你好	ni3hao3
+我	wo3
+是	shi4
+的	de5
+人	ren2
+我们	wo3men
+中国	zhong1guo2
+的	de5
+北京	bei3jing1
+上海	shang4hai3
+广州	guang3zhou1
+深圳	shen1zhen4
+今天	jin1tian1
+明天	ming2tian1
+昨天	zuotian1
+谢谢	xie4xie4
+不客气	bu4ke4qi4
+再见	zai4jian4
+对不起	dui4bu5qi3
+没关系	mei2guan1xi4

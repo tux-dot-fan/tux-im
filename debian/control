@@ -1,0 +1,40 @@
+Source: tux-im
+Section: utils
+Priority: optional
+Maintainer: TUX IM contributors <tux-im@example.com>
+Build-Depends: debhelper-compat (= 13),
+               dh-sequence-python3,
+               pybuild-plugin-pyproject,
+               python3-all (>= 3.12),
+               python3-gi,
+               python3-ibus-1.0,
+               python3-tomli-w,
+               python3-httpx,
+               python3-sounddevice,
+Standards-Version: 4.7.0
+Homepage: https://github.com/tux-im/tux-im
+Rules-Requires-Root: no
+
+Package: tux-im
+Architecture: all
+Depends: ${python3:Depends},
+         ${misc:Depends},
+         ibus (>= 1.5),
+         python3-gi,
+         python3-ibus-1.0,
+         python3-tomli-w,
+         python3-httpx,
+         python3-sounddevice,
+         librime-data-wubi (>= 0.0~) | rime-data-wubi,
+         librime-data-luna-pinyin (>= 0.0~) | rime-data-luna-pinyin,
+Recommends: librime-data-wubi,
+            librime-data-luna-pinyin,
+Description: IBus input method engine for Chinese (Pinyin, Wubi, Wbpy, ASR)
+ TUX IM is a Python-based IBus engine that provides:
+  * Pinyin phonetic input
+  * Wubi 86 stroke input
+  * Wbpy (automatic mixed Wubi + Pinyin)
+  * ASR voice input via cloud API
+ .
+ It uses RIME-format dictionaries and integrates with the IBus framework
+ on Linux desktops.

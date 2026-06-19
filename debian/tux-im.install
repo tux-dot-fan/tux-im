@@ -1,0 +1,4 @@
+setup/com.github.tux-im.TuxIM.xml usr/share/ibus/component
+setup/com.github.tux-im.TuxIM.service usr/share/dbus-1/services
+setup/tux-im-setup.desktop usr/share/applications
+data/*.yaml usr/share/tux-im/

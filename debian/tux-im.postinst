@@ -1,0 +1,11 @@
+#!/bin/sh
+set -e
+#DEBHELPER#
+
+# Note: we intentionally do NOT auto-restart ibus-daemon from postinst.
+# `ibus restart` requires a running user session (XDG_RUNTIME_DIR, dbus-launch)
+# and will fail in chroot/headless installs.  Users can run:
+#     ibus restart
+# after the install completes, or simply log out and back in.
+
+exit 0

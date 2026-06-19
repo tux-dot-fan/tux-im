@@ -1,0 +1,39 @@
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Debian build artifacts
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.debhelper
+debian/*.substvars
+debian/tux-im/
+pybuild/
+.pybuild/
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*~
+
+# Logs
+*.log
+
+# Local config overrides
+config.local.toml

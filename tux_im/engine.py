@@ -1,0 +1,264 @@
+"""Core IBus engine class."""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING
+
+import gi
+
+gi.require_version("IBus", "1.0")
+from gi.repository import IBus  # noqa: E402
+
+from tux_im.input.base import KeyResult
+from tux_im.input.latin import LatinMode
+from tux_im.input.pinyin import PinyinMode
+from tux_im.input.wbpy import WbpyMode
+from tux_im.input.wubi import WubiMode
+
+if TYPE_CHECKING:
+    from tux_im.config.config import Config
+    from tux_im.input.lexicon import Lexicon
+    from tux_im.shortcut import ShortcutManager
+
+log = logging.getLogger(__name__)
+
+_config: "Config | None" = None
+_lexicon: "Lexicon | None" = None
+_shortcuts: "ShortcutManager | None" = None
+
+ENGINES_BY_MODE: dict[str, type] = {
+    "pinyin": PinyinMode,
+    "wubi": WubiMode,
+    "wbpy": WbpyMode,
+}
+
+
+# Property key GNOME Shell's IBus indicator watches for the language badge.
+# See js/ui/status/keyboard.js in gnome-shell: a property whose key equals
+# 'InputMode' has its symbol/label text used as the indicator text instead
+# of the static `language` field from the engine descriptor.
+INPUT_MODE_PROP_KEY: str = "InputMode"
+
+
+class TuxEngine(IBus.Engine):
+    """Main IBus engine for TUX IM."""
+
+    __gtype_name__ = "TuxEngine"
+
+    def __init__(
+        self,
+        config: Config | None = None,
+        lexicon: Lexicon | None = None,
+        shortcuts: ShortcutManager | None = None,
+    ) -> None:
+        super().__init__()
+        self._chinese_mode: bool = True
+        self._page_index: int = 0
+        self._chinese_prop_key: str = "tux-im:chinese"
+        self._chinese_prop: IBus.Property | None = None
+        self._initialized: bool = False
+
+    def _lazy_init(self) -> None:
+        if self._initialized:
+            return
+        if _config is None or _lexicon is None or _shortcuts is None:
+            log.warning("_lazy_init: globals not ready yet (config=%s, lexicon=%s, shortcuts=%s)", _config, _lexicon, _shortcuts)
+            return
+        self._initialized = True
+        self._active_mode = self._make_mode(_config.ime.default_mode)
+
+    # ---- Mode management ----
+
+    def _make_mode(self, name: str):
+        cls = ENGINES_BY_MODE.get(name, PinyinMode)
+        if cls is PinyinMode:
+            return PinyinMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
+        if cls is WubiMode:
+            return WubiMode(_lexicon.wubi, _config)  # type: ignore[union-attr]
+        if cls is WbpyMode:
+            mode = WbpyMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
+            mode.attach_wubi(_lexicon.wubi)  # type: ignore[union-attr]
+            return mode
+        return LatinMode(_config)  # type: ignore[union-attr]
+
+    def set_mode(self, name: str) -> None:
+        self._lazy_init()
+        log.info("Switching input mode: %s", name)
+        self._active_mode = self._make_mode(name)
+        self._refresh_preedit()
+
+    def toggle_chinese(self) -> None:
+        self._lazy_init()
+        self._chinese_mode = not self._chinese_mode
+        log.info("Chinese mode toggled: %s", self._chinese_mode)
+        if not self._chinese_mode:
+            self._commit_and_reset()
+        self._refresh_preedit()
+        self._update_chinese_prop()
+        log.debug("toggle_chinese: label=%s", "CN" if self._chinese_mode else "EN")
+
+    # ---- IBus lifecycle hooks ----
+
+    def do_focus_in(self) -> None:  # type: ignore[override]
+        log.debug("focus_in: registering properties")
+        self._lazy_init()
+        prop_list = self._build_prop_list()
+        log.debug("focus_in: properties registered")
+        self.register_properties(prop_list)
+        log.debug("focus_in: done")
+
+    def do_focus_out(self) -> None:  # type: ignore[override]
+        log.debug("focus_out")
+        self._commit_and_reset()
+
+    def do_reset(self) -> None:  # type: ignore[override]
+        log.debug("reset")
+        self._commit_and_reset()
+
+    def do_enable(self) -> None:  # type: ignore[override]
+        log.debug("enable")
+        self._lazy_init()
+        _shortcuts.register("toggle_en_cn", self.toggle_chinese)
+
+    def do_disable(self) -> None:  # type: ignore[override]
+        log.debug("disable")
+        self._commit_and_reset()
+
+    def do_process_key_event(  # type: ignore[override]
+        self, keyval: int, keycode: int, state: int
+    ) -> bool:
+        try:
+            return self._handle_key(keyval, state)
+        except Exception:  # pragma: no cover - defensive
+            log.exception("Unhandled error processing key %d", keyval)
+            self._commit_and_reset()
+            return False
+
+    # ---- Key handling ----
+
+    def _handle_key(self, keyval: int, state: int) -> bool:
+        self._lazy_init()
+        # 1. Check global shortcuts first.
+        consumed = _shortcuts.handle(self, keyval, state)  # type: ignore[union-attr]
+        if consumed:
+            return True
+
+        # 2. In Latin mode, let everything pass through.
+        if not self._chinese_mode:
+            return False
+
+        # 3. Hand the key to the active input mode.
+        result = self._active_mode.feed_key(keyval, state)
+        if result is None:
+            return False
+
+        if result.commit is not None:
+            self.commit_text(IBus.Text.new_from_string(result.commit))
+        if result.clear:
+            self._active_mode.reset()
+        self._refresh_preedit()
+        return result.handled
+
+    # ---- Preedit / candidates ----
+
+    def _refresh_preedit(self) -> None:
+        if not self._initialized:
+            return
+        if not self._chinese_mode:
+            self.hide_preedit_text()
+            self.hide_auxiliary_text()
+            return
+
+        buf = self._active_mode.buffer
+        cands = self._active_mode.candidates(_config.ime.max_candidates)  # type: ignore[union-attr]
+
+        if buf or cands:
+            preedit = f"[{self._active_mode.name}] {buf}" if buf else f"[{self._active_mode.name}]"
+            self.update_preedit_text_with_mode(
+                IBus.Text.new_from_string(buf),
+                self._active_mode.cursor,
+                True,
+                IBus.PreeditFocusMode.COMMIT,
+            )
+            self.update_auxiliary_text(
+                IBus.Text.new_from_string(preedit), False,
+            )
+            if cands:
+                self.update_lookup_table(self._build_lookup(cands), True)
+        else:
+            self.hide_preedit_text()
+            self.hide_auxiliary_text()
+
+    def _build_lookup(self, cands: list) -> IBus.LookupTable:
+        table = IBus.LookupTable.new(9, 0, True, False)
+        for c in cands:
+            text = IBus.Text.new_from_string(c.display)
+            table.append_candidate(text)
+        return table
+
+    def _build_prop_list(self) -> IBus.PropList:
+        prop_list = IBus.PropList.new()
+        log.debug("_build_prop_list: creating props for modes %s, chinese_mode=%s", list(ENGINES_BY_MODE.keys()), self._chinese_mode)
+        for name in ENGINES_BY_MODE:
+            prop = IBus.Property.new(
+                f"tux-im:{name}",
+                IBus.PropType.NORMAL,
+                IBus.Text.new_from_string(name.capitalize()),
+                "",
+                IBus.Text.new_from_string(""),
+                True,
+                True,
+                IBus.PropState.UNCHECKED,
+            )
+            prop_list.append(prop)
+        label = "CN" if self._chinese_mode else "EN"
+        state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
+        log.debug("_build_prop_list: InputMode prop label=%s state=%s", label, state)
+        self._chinese_prop = IBus.Property.new(
+            INPUT_MODE_PROP_KEY,
+            IBus.PropType.TOGGLE,
+            IBus.Text.new_from_string(label),
+            "",
+            IBus.Text.new_from_string(""),
+            True,
+            True,
+            state,
+        )
+        # GNOME Shell's indicator shows the symbol text of the InputMode prop
+        # in place of the static engine language. See js/ui/status/keyboard.js
+        # in gnome-shell: when a registered property has key === "InputMode",
+        # the indicator label is taken from its symbol (falling back to label).
+        self._chinese_prop.set_symbol(IBus.Text.new_from_string(label))
+        prop_list.append(self._chinese_prop)
+        log.debug("_build_prop_list: returning prop_list, _chinese_prop=%s", self._chinese_prop)
+        return prop_list
+
+    def _update_chinese_prop(self) -> None:
+        if not self._initialized or self._chinese_prop is None:
+            log.debug("_update_chinese_prop: skipping, not ready")
+            return
+        state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
+        label = "CN" if self._chinese_mode else "EN"
+        log.debug("_update_chinese_prop: updating, label=%s state=%s", label, state)
+        self._chinese_prop.set_state(state)
+        self._chinese_prop.set_label(IBus.Text.new_from_string(label))
+        self._chinese_prop.set_symbol(IBus.Text.new_from_string(label))
+        self.update_property(self._chinese_prop)
+
+    # ---- Commit / reset ----
+
+    def _commit_and_reset(self) -> None:
+        if not self._initialized:
+            return
+        pending = self._active_mode.commit()  # type: ignore[union-attr]
+        if pending:
+            self.commit_text(IBus.Text.new_from_string(pending))
+        self._active_mode.reset()
+        self.hide_preedit_text()
+        self.hide_auxiliary_text()
+
+    def quit(self) -> None:
+        from gi.repository import IBus as _IBus
+
+        _IBus.quit()
