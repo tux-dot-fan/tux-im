@@ -82,15 +82,20 @@ class ShortcutManager:
         """Register a handler for a named shortcut action."""
         self._handlers[action] = handler
 
-    def _call_handler(self, action: str, engine) -> None:
+    def _call_handler(self, action: str, engine) -> bool:
+        """Call the registered handler. Return True if the key was consumed."""
         handler = self._handlers.get(action)
-        if handler is not None:
-            try:
-                handler(engine)
-            except TypeError:
-                handler()
-        else:
+        if handler is None:
             log.debug("Shortcut %s pressed but no handler", action)
+            return False
+        # Handlers may take (engine) or no args; they may return True/False to
+        # indicate whether they actually consumed the key.
+        for call in (lambda: handler(engine), lambda: handler()):
+            try:
+                return bool(call())
+            except TypeError:
+                continue
+        return True
 
     def rebuild(self) -> None:
         self._bindings.clear()
@@ -110,6 +115,5 @@ class ShortcutManager:
             return False
         for parsed, action in self._bindings:
             if parsed.matches(keyval, state):
-                self._call_handler(action, engine)
-                return True
+                return self._call_handler(action, engine)
         return False

@@ -88,7 +88,8 @@ class TuxEngine(IBus.Engine):
         self._active_mode = self._make_mode(name)
         self._refresh_preedit()
 
-    def toggle_chinese(self) -> None:
+    def toggle_chinese(self) -> bool:
+        log.debug("toggle_chinese handler entered")
         self._lazy_init()
         self._chinese_mode = not self._chinese_mode
         log.info("Chinese mode toggled: %s", self._chinese_mode)
@@ -97,6 +98,84 @@ class TuxEngine(IBus.Engine):
         self._refresh_preedit()
         self._update_chinese_prop()
         log.debug("toggle_chinese: label=%s", "CN" if self._chinese_mode else "EN")
+        return True
+
+    # ---- Shortcut handlers (bound to engine, called with engine arg) ----
+
+    def commit_first(self, *_args) -> bool:
+        log.debug("commit_first handler entered")
+        self._lazy_init()
+        if not self._chinese_mode:
+            log.debug("commit_first: not chinese mode, pass-through")
+            return False
+        if not self._active_mode.buffer:
+            log.debug("commit_first: empty buffer, pass-through")
+            return False
+        result = self._active_mode.commit()
+        log.info("commit_first: committed=%r", result)
+        if result:
+            self.commit_text(IBus.Text.new_from_string(result))
+        self._active_mode.reset()
+        self._refresh_preedit()
+        return True
+
+    def select_candidate(self, index: int, *_args) -> bool:
+        log.debug("select_candidate(%d) handler entered", index)
+        self._lazy_init()
+        if not self._chinese_mode:
+            log.debug("select_candidate(%d): not chinese mode, pass-through", index)
+            return False
+        result = self._active_mode.select(index)
+        log.info("select_candidate(%d): commit=%r handled=%s", index, result.commit, result.handled)
+        if result.commit is not None:
+            self.commit_text(IBus.Text.new_from_string(result.commit))
+        if result.clear:
+            self._active_mode.reset()
+        self._refresh_preedit()
+        return result.handled
+
+    def page_candidates(self, direction: int, *_args) -> bool:
+        log.debug("page_candidates(%d) handler entered", direction)
+        self._lazy_init()
+        if not self._chinese_mode:
+            log.debug("page_candidates(%d): not chinese mode, pass-through", direction)
+            return False
+        self._active_mode.page(direction)
+        self._refresh_preedit()
+        return True
+
+    def delete_left(self, *_args) -> bool:
+        log.debug("delete_left handler entered, chinese_mode=%s buffer=%r",
+                  self._chinese_mode,
+                  self._active_mode.buffer if self._initialized else None)
+        self._lazy_init()
+        if not self._chinese_mode:
+            # English mode: pass BackSpace to the app.
+            log.debug("delete_left: english mode, pass-through")
+            return False
+        if self._active_mode.buffer:
+            self._active_mode.buffer = self._active_mode.buffer[:-1]
+            self._active_mode.cursor = len(self._active_mode.buffer)
+            self._refresh_preedit()
+            log.debug("delete_left: buffer=%r", self._active_mode.buffer)
+            return True
+        # Chinese mode but buffer empty: pass BackSpace to the app.
+        log.debug("delete_left: chinese mode but empty buffer, pass-through")
+        return False
+
+    def cancel_composition(self, *_args) -> bool:
+        log.debug("cancel_composition handler entered")
+        self._lazy_init()
+        if not self._chinese_mode:
+            log.debug("cancel_composition: not chinese mode, pass-through")
+            return False
+        if self._active_mode.buffer:
+            self._active_mode.reset()
+            self._refresh_preedit()
+            log.debug("cancel_composition: buffer cleared")
+            return True
+        log.debug("cancel_composition: empty buffer, pass-through")
+        return False
 
     # ---- IBus lifecycle hooks ----
 
@@ -117,13 +196,27 @@ class TuxEngine(IBus.Engine):
         self._commit_and_reset()
 
     def do_enable(self) -> None:  # type: ignore[override]
-        log.debug("enable")
+        log.debug("enable: registering shortcut handlers")
         self._lazy_init()
         _shortcuts.register("toggle_en_cn", self.toggle_chinese)
+        _shortcuts.register("commit_first", self.commit_first)
+        _shortcuts.register("delete_left", self.delete_left)
+        _shortcuts.register("cancel", self.cancel_composition)
+        _shortcuts.register("clear_buffer", self.cancel_composition)
+        _shortcuts.register("page_up", lambda *_a: self.page_candidates(-1))
+        _shortcuts.register("page_down", lambda *_a: self.page_candidates(1))
+        for i in range(9):
+            _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))
+        log.debug("enable: registered handlers for toggle_en_cn, commit_first, "
+                  "delete_left, cancel, clear_buffer, page_up, page_down, "
+                  "candidate_1..9")
 
     def do_disable(self) -> None:  # type: ignore[override]
         log.debug("disable")
         self._commit_and_reset()
+
+    def _select_n(self, index: int):
+        return lambda *_a: self.select_candidate(index)
 
     def do_process_key_event(  # type: ignore[override]
         self, keyval: int, keycode: int, state: int
