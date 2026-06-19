@@ -221,6 +221,12 @@ class TuxEngine(IBus.Engine):
     def do_process_key_event(  # type: ignore[override]
         self, keyval: int, keycode: int, state: int
     ) -> bool:
+        # Filter key-release events up-front. IBus delivers both press and
+        # release for every key; only the press should be processed.
+        if state & IBus.ModifierType.RELEASE_MASK:
+            return False
+        log.debug("do_process_key_event: keyval=%d keycode=%d state=0x%x",
+                  keyval, keycode, state)
         try:
             return self._handle_key(keyval, state)
         except Exception:  # pragma: no cover - defensive
