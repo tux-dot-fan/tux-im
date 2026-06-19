@@ -88,6 +88,20 @@ class TuxEngine(IBus.Engine):
         self._active_mode = self._make_mode(name)
         self._refresh_preedit()
 
+    def cycle_mode(self, *_args) -> bool:
+        log.debug("cycle_mode handler entered")
+        self._lazy_init()
+        modes = list(ENGINES_BY_MODE.keys())
+        try:
+            current = self._active_mode.name
+            idx = modes.index(current)
+        except (AttributeError, ValueError):
+            idx = -1
+        next_name = modes[(idx + 1) % len(modes)]
+        log.info("cycle_mode: %s -> %s", current, next_name)
+        self.set_mode(next_name)
+        return True
+
     def toggle_chinese(self) -> bool:
         log.debug("toggle_chinese handler entered")
         self._lazy_init()
@@ -205,15 +219,27 @@ class TuxEngine(IBus.Engine):
         _shortcuts.register("clear_buffer", self.cancel_composition)
         _shortcuts.register("page_up", lambda *_a: self.page_candidates(-1))
         _shortcuts.register("page_down", lambda *_a: self.page_candidates(1))
+        _shortcuts.register("cycle_mode", self.cycle_mode)
         for i in range(9):
             _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))
         log.debug("enable: registered handlers for toggle_en_cn, commit_first, "
                   "delete_left, cancel, clear_buffer, page_up, page_down, "
-                  "candidate_1..9")
+                  "cycle_mode, candidate_1..9")
 
     def do_disable(self) -> None:  # type: ignore[override]
         log.debug("disable")
         self._commit_and_reset()
+
+    def do_property_activate(  # type: ignore[override]
+        self, prop_name: str, prop_state: int
+    ) -> None:
+        log.debug("do_property_activate: prop=%s state=%d", prop_name, prop_state)
+        if prop_name in ENGINES_BY_MODE:
+            self.set_mode(prop_name)
+            return
+        if prop_name == INPUT_MODE_PROP_KEY:
+            self.toggle_chinese()
+            return
 
     def _select_n(self, index: int):
         return lambda *_a: self.select_candidate(index)
