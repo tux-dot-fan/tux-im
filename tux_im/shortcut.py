@@ -34,32 +34,42 @@ class ParsedShortcut:
 
 
 def parse_shortcut(spec: str) -> ParsedShortcut:
-    """Parse a GTK accelerator-style spec, e.g. '<Ctrl>grave', 'Caps_Lock'."""
+    """Parse a GTK accelerator-style spec, e.g. '<Ctrl>grave', 'Caps_Lock'.
+
+    Spec grammar: zero or more ``<Modifier>`` groups followed by a key name.
+    Modifiers may appear in any order. Examples that parse identically:
+        ``<Ctrl><Shift>m``  ``<Shift><Ctrl>m``  ``<Ctrl>m``  ``m``.
+    """
+    import re
+
     spec = spec.strip()
     if not spec:
         raise ValueError("empty shortcut spec")
 
-    parts = spec.replace(">", "><").strip("<>").split("><")
+    # Split on the boundaries between modifier groups and the key name.
+    # A modifier group looks like ``<...>``; the key name is whatever
+    # remains at the end (possibly with no angle brackets).
+    mod_pat = re.compile(r"<([^>]+)>")
     mods = 0
-    keys: list[str] = []
-    for p in parts:
-        pl = p.lower()
-        if pl in ("ctrl", "control"):
+    pos = 0
+    for m in mod_pat.finditer(spec):
+        token = m.group(1).strip().lower()
+        if token in ("ctrl", "control"):
             mods |= IBus.ModifierType.CONTROL_MASK
-        elif pl in ("shift",):
+        elif token == "shift":
             mods |= IBus.ModifierType.SHIFT_MASK
-        elif pl in ("alt", "mod1"):
+        elif token in ("alt", "mod1"):
             mods |= IBus.ModifierType.MOD1_MASK
-        elif pl in ("super", "win", "meta"):
+        elif token in ("super", "win", "meta"):
             mods |= IBus.ModifierType.SUPER_MASK
         else:
-            keys.append(p)
+            raise ValueError(f"unknown modifier {token!r} in {spec!r}")
+        pos = m.end()
 
-    if not keys:
+    keyname = spec[pos:].strip()
+    if not keyname:
         raise ValueError(f"no key in shortcut: {spec!r}")
 
-    # Use last non-modifier token as the key.
-    keyname = keys[-1]
     if keyname.lower() == "space":
         keyname = "space"
     keyval = IBus.keyval_from_name(keyname)

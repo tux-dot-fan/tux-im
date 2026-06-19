@@ -87,6 +87,7 @@ class TuxEngine(IBus.Engine):
         log.info("Switching input mode: %s", name)
         self._active_mode = self._make_mode(name)
         self._refresh_preedit()
+        self._update_chinese_prop()
 
     def cycle_mode(self, *_args) -> bool:
         log.debug("cycle_mode handler entered")
@@ -337,7 +338,7 @@ class TuxEngine(IBus.Engine):
                 IBus.PropState.UNCHECKED,
             )
             prop_list.append(prop)
-        label = "CN" if self._chinese_mode else "EN"
+        label = self._input_mode_label()
         state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
         log.debug("_build_prop_list: InputMode prop label=%s state=%s", label, state)
         self._chinese_prop = IBus.Property.new(
@@ -363,13 +364,29 @@ class TuxEngine(IBus.Engine):
         if not self._initialized or self._chinese_prop is None:
             log.debug("_update_chinese_prop: skipping, not ready")
             return
+        label = self._input_mode_label()
         state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
-        label = "CN" if self._chinese_mode else "EN"
         log.debug("_update_chinese_prop: updating, label=%s state=%s", label, state)
         self._chinese_prop.set_state(state)
         self._chinese_prop.set_label(IBus.Text.new_from_string(label))
         self._chinese_prop.set_symbol(IBus.Text.new_from_string(label))
         self.update_property(self._chinese_prop)
+
+    def _input_mode_label(self) -> str:
+        """Short label for the InputMode property shown in the IBus indicator.
+
+        GNOME Shell's keyboard.js renders the symbol/label text of the
+        InputMode property as the indicator badge. When Chinese mode is on we
+        show the active sub-mode abbreviation so the user can tell pinyin /
+        wubi / wbpy apart at a glance.
+        """
+        if not self._chinese_mode:
+            return "EN"
+        try:
+            mode_name = self._active_mode.name
+        except AttributeError:
+            return "CN"
+        return {"pinyin": "拼", "wubi": "五", "wbpy": "混"}.get(mode_name, "CN")
 
     # ---- Commit / reset ----
 
