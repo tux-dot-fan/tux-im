@@ -65,9 +65,12 @@ class WubiMode:
         return cands[self._page_offset : self._page_offset + limit]
 
     def select(self, index: int) -> KeyResult:
-        cands = self.candidates(limit=9)
-        if 0 <= index < len(cands):
-            return KeyResult(handled=True, commit=cands[index].text, clear=True)
+        # Grab all candidates and apply _page_offset so second-page
+        # selections (e.g. key "1" when on page 2) land on the right entry.
+        all_cands = self.candidates(limit=9999)
+        pos = self._page_offset + index
+        if 0 <= pos < len(all_cands):
+            return KeyResult(handled=True, commit=all_cands[pos].text, clear=True)
         return KeyResult(handled=False)
 
     def page(self, direction: int) -> KeyResult:

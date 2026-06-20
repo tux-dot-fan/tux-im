@@ -118,9 +118,12 @@ class WbpyMode:
         return unique[self._page_offset : self._page_offset + limit]
 
     def select(self, index: int) -> KeyResult:
-        cands = self.candidates(limit=9)
-        if 0 <= index < len(cands):
-            return KeyResult(handled=True, commit=cands[index].text, clear=True)
+        # Grab all merged candidates and apply _page_offset so second-page
+        # selections land on the right entry.
+        all_cands = self.candidates(limit=9999)
+        pos = self._page_offset + index
+        if 0 <= pos < len(all_cands):
+            return KeyResult(handled=True, commit=all_cands[pos].text, clear=True)
         return KeyResult(handled=False)
 
     def page(self, direction: int) -> KeyResult:
@@ -145,10 +148,13 @@ class WbpyMode:
             return False
         if any(c.isdigit() for c in buf):
             return False
-        # First-letter bias.
-        if buf[0] in _WUBI_FIRST_KEY_HINTS:
-            return True
-        return True  # default: assume wubi-shaped is possible
+        # Conservative: only treat as wubi when the buffer is an actual
+        # wubi prefix in the trie.  The first-key hint is a last-resort
+        # fallback when the trie is not yet attached (attach_wubi runs
+        # after construction in the engine).
+        if self._wubi_mode is not None:
+            return self._wubi_mode._trie.has_prefix(buf)
+        return buf[0] in _WUBI_FIRST_KEY_HINTS
 
     def _looks_like_pinyin(self, buf: str) -> bool:
         if not buf:

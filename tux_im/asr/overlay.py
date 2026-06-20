@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from enum import Enum
 from typing import Optional
 
@@ -13,6 +14,8 @@ gi.require_version("Gtk", "3.0")
 from gi.repository import Gdk, GLib, Gtk  # noqa: E402
 
 log = logging.getLogger(__name__)
+
+_PI_2 = math.pi / 2
 
 
 class OverlayState(str, Enum):
@@ -157,10 +160,10 @@ class OverlayWindow:
         w, h = alloc.width, alloc.height
         r = 8
         cr.new_sub_path()
-        cr.arc(w - r, r, r, -math_pi_2, 0)
-        cr.arc(w - r, h - r, r, 0, math_pi_2)
-        cr.arc(r, h - r, r, math_pi_2, math_pi)
-        cr.arc(r, r, r, math_pi, 3 * math_pi_2)
+        cr.arc(w - r, r, r, -_PI_2, 0)
+        cr.arc(w - r, h - r, r, 0, _PI_2)
+        cr.arc(r, h - r, r, _PI_2, math.pi)
+        cr.arc(r, r, r, math.pi, 3 * _PI_2)
         cr.close_path()
         cr.set_source_rgba(0.1, 0.1, 0.12, 0.92)
         cr.fill_preserve()
@@ -169,5 +172,3 @@ class OverlayWindow:
         cr.stroke()
         return False
 
-
-math_pi_2 = __import__("math").pi / 2
