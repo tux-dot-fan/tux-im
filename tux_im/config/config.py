@@ -191,10 +191,40 @@ class Config:
 
 
 def _merge(dataclass_obj, data: dict[str, Any]):
-    """Return a copy of dataclass_obj with fields overridden by data."""
+    """Return a copy of dataclass_obj with fields overridden by data.
+
+    Unknown fields are silently dropped (backwards compatibility when new
+    config keys are added).  Type mismatches are also dropped and logged
+    so a typo like ``max_candidates = "9"`` (string instead of int) does
+    not corrupt the dataclass.
+    """
     from dataclasses import asdict, replace
+    from typing import get_origin, get_args
 
     if not isinstance(data, dict):
         return dataclass_obj
-    valid = {k: v for k, v in data.items() if k in asdict(dataclass_obj)}
+    valid = {}
+    schema = asdict(dataclass_obj)
+    for k, v in data.items():
+        if k not in schema:
+            log.debug("_merge: unknown field %r, ignoring", k)
+            continue
+        expected_type = schema[k]
+        # Unwrap Optional[T] (get_origin == Union, get_args gives (T, NoneType)).
+        origin = get_origin(expected_type)
+        if origin is type(None):
+            # bare Optional without args
+            continue
+        if origin is not None:
+            # For Optional[T] or Union[T, ...], accept None and T.
+            args = get_args(expected_type)
+            if v is not None and not isinstance(v, args):
+                log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
+                            k, expected_type, v, type(v).__name__)
+                continue
+        elif not isinstance(v, expected_type):
+            log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
+                        k, expected_type, v, type(v).__name__)
+            continue
+        valid[k] = v
     return replace(dataclass_obj, **valid)

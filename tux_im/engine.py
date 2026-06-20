@@ -247,9 +247,11 @@ class TuxEngine(IBus.Engine):
         _shortcuts.register("cycle_mode", self.cycle_mode)  # type: ignore[union-attr]
         for i in range(9):
             _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))  # type: ignore[union-attr]
+        # "0" selects the 10th candidate (Rime/FCITX convention).
+        _shortcuts.register("candidate_10", self._select_n(9))  # type: ignore[union-attr]
         log.debug("enable: registered handlers for toggle_en_cn, commit_first, "
                   "delete_left, cancel, clear_buffer, page_up, page_down, "
-                  "cycle_mode, candidate_1..9")
+                  "cycle_mode, candidate_1..10")
 
     def do_disable(self) -> None:  # type: ignore[override]
         log.debug("disable: committing composition and clearing shortcuts")
