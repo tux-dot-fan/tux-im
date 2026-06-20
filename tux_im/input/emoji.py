@@ -297,7 +297,7 @@ class EmojiMode:
     buffer = ""
     cursor = 0
 
-    def __init__(self, config) -> None:  # noqa: ARG002
+    def __init__(self, config: object) -> None:  # noqa: ARG002
         # Store keyword as code and emoji as word.
         # _trie: code=keyword → word=emoji
         # _emoji_to_keyword: emoji → keyword (reverse lookup)

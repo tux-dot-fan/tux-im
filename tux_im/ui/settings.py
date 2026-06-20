@@ -165,7 +165,7 @@ class SettingsWindow:
 
     # ---- actions ----
 
-    def _on_save(self, _btn) -> None:
+    def _on_save(self, _btn: object) -> None:
         from dataclasses import replace
 
         self._config.ime = replace(
@@ -196,7 +196,7 @@ class SettingsWindow:
         self._config.save()
         log.info("Config saved to %s", self._config.path)
 
-    def _on_reset(self, _btn) -> None:
+    def _on_reset(self, _btn: object) -> None:
         self._config.__init__()  # type: ignore[misc]
         log.info("Config reset to defaults (not yet saved)")
 
@@ -204,7 +204,7 @@ class SettingsWindow:
         self.win.show_all()
 
 
-def _wrap(widget) -> Gtk.Box:
+def _wrap(widget: Gtk.Widget) -> Gtk.Box:
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
     box.pack_start(widget, True, True, 0)
     return box

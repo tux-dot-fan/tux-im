@@ -6,17 +6,17 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from typing import Optional
+from typing import Callable, Optional, cast
 
 log = logging.getLogger(__name__)
 
 try:
-    import sounddevice as sd  # type: ignore
-    import numpy as np  # type: ignore
+    import sounddevice as sd  # type: ignore[misc]
+    import numpy as np  # type: ignore[misc]
     _HAVE_SD = True
 except ImportError:  # pragma: no cover
-    sd = None  # type: ignore
-    np = None  # type: ignore
+    sd = None  # type: ignore[misc]
+    np = None  # type: ignore[misc]
     _HAVE_SD = False
 
 
@@ -96,10 +96,10 @@ class AudioCapture:
 
     # ---- internals ----
 
-    def _on_audio(self, indata, frames, time_info, status) -> None:
+    def _on_audio(self, indata: object, frames: int, time_info: object, status: object) -> None:
         if status:
             log.debug("audio status: %s", status)
-        chunk = indata.copy().reshape(-1)
+        chunk = cast("np.ndarray", indata).copy().reshape(-1)
         with self._lock:
             self._frames.append(chunk)
         # Compute RMS for level meter + VAD.

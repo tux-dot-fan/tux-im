@@ -26,7 +26,7 @@ class WubiMode:
     buffer: str
     cursor: int
 
-    def __init__(self, trie: Trie, config) -> None:
+    def __init__(self, trie: Trie, config: object) -> None:
         self._trie = trie
         self._config = config
         self.buffer = ""

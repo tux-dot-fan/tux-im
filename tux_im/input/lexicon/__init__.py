@@ -20,7 +20,10 @@ import logging
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterable, Iterator
+from typing import TYPE_CHECKING, Callable, IO, Iterable, Iterator
+
+if TYPE_CHECKING:
+    from tux_im.config.config import Config
 
 from tux_im.input.lexicon._persistence import (
     _discover_dicts,
@@ -41,7 +44,7 @@ class Lexicon:
     """Collection of pinyin and wubi tries with user-word persistence.
 
     Built by ``Lexicon.load(config)``.  User-learned words are flushed to
-    ``config.dict.user_words_path`` on:
+    ``config.dictionary.user_words_path`` on:
       - ``add_user_word()`` call (debounced)
       - ``_flush_now()`` explicit call
       - normal Python exit (via ``atexit``)
@@ -56,13 +59,13 @@ class Lexicon:
     # Paths set by load(); used by _schedule_flush().
     _user_words_path: Path = field(default=None, repr=False)  # type: ignore[assignment]
     _dirty: bool = field(default=False, repr=False)
-    _flush_timer: Callable | None = field(default=None, repr=False)
+    _flush_timer: Callable[[], bool] | None = field(default=None, repr=False)
 
     @classmethod
-    def load(cls, config) -> "Lexicon":  # noqa: ANN001
+    def load(cls, config: Config) -> "Lexicon":  # noqa: ANN001
         lex = cls()
         # Load system dictionaries first.
-        for path, scheme in _discover_dicts(config.dict.search_paths):
+        for path, scheme in _discover_dicts(config.dictionary.search_paths):
             trie = lex.pinyin if scheme == "pinyin" else lex.wubi
             count = 0
             for word, code, freq in load_rime_dict(path):
@@ -70,7 +73,7 @@ class Lexicon:
                 count += 1
             log.info("Loaded %d entries from %s into %s trie", count, path, scheme)
         # Overlay user-learned words on top.
-        user_path = Path(config.dict.user_words_path)
+        user_path = Path(config.dictionary.user_words_path)
         lex._user_words_path = user_path
         if user_path.exists():
             n_user = lex._load_user_words(user_path)
@@ -139,7 +142,7 @@ class Lexicon:
                     pass
 
     @staticmethod
-    def _write_user_words(fh, trie: Trie) -> None:
+    def _write_user_words(fh: IO[str], trie: "Trie") -> None:
         """Write every entry in ``trie`` as a TSV line."""
         written: set[tuple[str, str]] = set()
         for entry in trie.iter_words():

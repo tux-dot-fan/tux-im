@@ -7,6 +7,8 @@ import math
 from enum import Enum
 from typing import Optional
 
+import cairo
+
 import gi
 
 gi.require_version("Gdk", "3.0")
@@ -147,14 +149,14 @@ class OverlayWindow:
         self._alts.set_text(rendered)
 
     def get_transcript(self) -> str:
-        return self._text.get_text()
+        return str(self._text.get_text())
 
     def set_transcript(self, text: str) -> None:
         self._text.set_text(text)
 
     # ---- internals ----
 
-    def _on_draw(self, widget, cr):
+    def _on_draw(self, widget: Gtk.Widget, cr: object) -> bool:  # type: ignore[type-arg]
         # Rounded background.
         alloc = widget.get_allocation()
         w, h = alloc.width, alloc.height

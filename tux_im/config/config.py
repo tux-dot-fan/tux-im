@@ -113,7 +113,7 @@ class Config:
     shortcuts: ShortcutSection = field(default_factory=ShortcutSection)
     asr: ASRSection = field(default_factory=ASRSection)
     ui: UISection = field(default_factory=UISection)
-    dict: DictSection = field(default_factory=DictSection)
+    dictionary: DictSection = field(default_factory=DictSection)
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
@@ -140,7 +140,7 @@ class Config:
         if "ui" in data:
             self.ui = _merge(self.ui, data["ui"])
         if "dictionary" in data:
-            self.dict = _merge(self.dict, data["dictionary"])
+            self.dictionary = _merge(self.dictionary, data["dictionary"])
         if "ime" in data and "shortcuts" in data["ime"]:
             self.shortcuts = _merge(self.shortcuts, data["ime"]["shortcuts"])
 
@@ -177,9 +177,9 @@ class Config:
                 "font_size": self.ui.font_size,
             },
             "dictionary": {
-                "search_paths": self.dict.search_paths,
-                "user_words_path": self.dict.user_words_path,
-                "learn_enabled": self.dict.learn_enabled,
+                "search_paths": self.dictionary.search_paths,
+                "user_words_path": self.dictionary.user_words_path,
+                "learn_enabled": self.dictionary.learn_enabled,
             },
         }
         with self.path.open("wb") as fh:
@@ -190,7 +190,7 @@ class Config:
             pass
 
 
-def _merge(dataclass_obj, data: dict[str, Any]):
+def _merge(dataclass_obj: Any, data: dict[str, Any]) -> Any:
     """Return a copy of dataclass_obj with fields overridden by data.
 
     Unknown fields are silently dropped (backwards compatibility when new

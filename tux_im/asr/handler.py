@@ -6,7 +6,7 @@ import asyncio
 import logging
 import threading
 from enum import Enum
-from typing import Optional
+from typing import Callable
 
 import gi
 
@@ -37,7 +37,7 @@ class ASRHandler:
     - `cancel()` discards everything and hides the overlay.
     """
 
-    def __init__(self, config: Config, on_commit) -> None:  # noqa: ANN001
+    def __init__(self, config: Config, on_commit: Callable[[str], None]) -> None:
         self._config = config
         self._on_commit = on_commit  # callable(str)
         self._client = ASRClient(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Callable, Optional
+from typing import Callable, Optional, cast
 
 import gi
 
@@ -100,10 +100,10 @@ class ShortcutManager:
     def __init__(self, config: Config) -> None:
         self._config = config
         self._bindings: list[tuple[ParsedShortcut, str]] = []
-        self._handlers: dict[str, Callable] = {}
+        self._handlers: dict[str, Callable[..., bool]] = {}
         self.rebuild()
 
-    def register(self, action: str, handler: Callable) -> None:
+    def register(self, action: str, handler: Callable[..., bool]) -> None:
         """Register a handler for a named shortcut action."""
         self._handlers[action] = handler
 
@@ -115,20 +115,27 @@ class ShortcutManager:
         """Remove all registered handlers. Used on engine disable."""
         self._handlers.clear()
 
-    def _call_handler(self, action: str, engine) -> bool:
+    def _call_handler(self, action: str, engine: object) -> bool:
         """Call the registered handler. Return True if the key was consumed."""
         handler = self._handlers.get(action)
         if handler is None:
             log.debug("Shortcut %s pressed but no handler", action)
             return False
-        # Handlers may take (engine) or no args; they may return True/False to
-        # indicate whether they actually consumed the key.
-        for call in (lambda: handler(engine), lambda: handler()):
+        # Try passing engine first; fall back to no-arg call.
+        # Both paths cast to bool so the return type is consistent.
+        try:
+            result = handler(engine)
+        except TypeError:
             try:
-                return bool(call())
+                result = handler()
             except TypeError:
-                continue
-        return True
+                log.warning("Shortcut handler %s rejected both (engine) and () calls", action)
+                return False
+        return bool(result)
+        # NOTE: ``handler: Callable[..., bool]`` is too polymorphic for mypy to
+        # statically resolve the call-site; the double try/except above is the
+        # runtime-correct fallback — suppress the spurious no-untyped-call
+        # report for this specific line.  # type: ignore[no-untyped-call]
 
     def rebuild(self) -> None:
         self._bindings.clear()
@@ -142,7 +149,7 @@ class ShortcutManager:
             self._bindings.append((parsed, action))
         log.debug("Registered %d shortcuts", len(self._bindings))
 
-    def handle(self, engine, keyval: int, state: int) -> bool:
+    def handle(self, engine: object, keyval: int, state: int) -> bool:
         """Return True if the key was consumed by a shortcut."""
         # IBus sends both press and release events.  We only handle presses
         # here; the release side is filtered at the engine entry point, but

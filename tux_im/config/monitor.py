@@ -42,7 +42,8 @@ class FileMonitor:
         if self._monitor is not None:
             self._monitor.cancel()
 
-    def _on_file_changed(self, monitor, file, other_file, event_type) -> None:
+    def _on_file_changed(self, monitor: Gio.FileMonitor, file: Gio.File,
+                         other_file: Gio.File | None, event_type: Gio.FileMonitorEvent) -> None:
         if event_type in (Gio.FileMonitorEvent.CHANGED, Gio.FileMonitorEvent.CREATED):
             log.info("Config file changed: %s", self._path)
             try:

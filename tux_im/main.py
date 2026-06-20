@@ -64,7 +64,7 @@ def main() -> int:
 
     def _reload_config(_file_obj: GLib.File, _other_file: GLib.File,
                       event_type: GLib.FileMonitorEvent,
-                      _user_data=None) -> None:
+                      _user_data: object | None = None) -> None:
         """Called by GLib when config.toml changes on disk."""
         if event_type not in (GLib.FileMonitorEvent.CHANGES_DONE_HINT,
                               GLib.FileMonitorEvent.CREATED):
@@ -82,6 +82,7 @@ def main() -> int:
             # Flush pending user words from the old lexicon before swapping it
             # out, so any learned words accumulated during the session are
             # persisted before the new lexicon starts loading from disk.
+            assert engine_module._lexicon is not None
             engine_module._lexicon._flush_now()
             engine_module._lexicon = new_lexicon
             log.info("Lexicon reloaded: pinyin=%d, wubi=%d",
@@ -98,8 +99,8 @@ def main() -> int:
             log.exception("Failed to rebuild shortcuts, keeping old ones")
             engine_module._shortcuts = shortcuts
 
-    monitor = config.path.parent.watch_file(config.path.name, GLib.PRIORITY_DEFAULT,
-                                           _reload_config, None)
+    gfile = GLib.file_new_for_path(str(config.path))
+    monitor = gfile.monitor_file(GLib.PRIORITY_DEFAULT, _reload_config, None)
     if monitor is not None:
         log.info("Watching %s for changes", config.path)
     else:
@@ -129,7 +130,7 @@ def main() -> int:
         log.warning("Failed to acquire bus name (result=%s). The engine may not be reachable.", result)
 
     # Quitting the main loop via signal.
-    def _on_signal(_sig, _frame):
+    def _on_signal(_sig: int, _frame: object | None) -> None:
         log.info("Signal %s received, quitting", _sig)
         IBus.quit()
 

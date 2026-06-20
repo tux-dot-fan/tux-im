@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import gi
 
 gi.require_version("IBus", "1.0")
 from gi.repository import IBus  # noqa: E402
 
-from tux_im.input.base import KeyResult
+from tux_im.input.base import Candidate, InputMode, KeyResult
 from tux_im.input.emoji import EmojiMode
 from tux_im.input.latin import LatinMode
 from tux_im.input.pinyin import PinyinMode
@@ -43,7 +43,7 @@ ENGINES_BY_MODE: dict[str, type] = {
 INPUT_MODE_PROP_KEY: str = "InputMode"
 
 
-class TuxEngine(IBus.Engine):
+class TuxEngine(IBus.Engine):  # type: ignore[misc]
     """Main IBus engine for TUX IM."""
 
     __gtype_name__ = "TuxEngine"
@@ -72,7 +72,7 @@ class TuxEngine(IBus.Engine):
 
     # ---- Mode management ----
 
-    def _make_mode(self, name: str):
+    def _make_mode(self, name: str) -> InputMode:
         cls = ENGINES_BY_MODE.get(name, PinyinMode)
         if cls is PinyinMode:
             return PinyinMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
@@ -83,8 +83,8 @@ class TuxEngine(IBus.Engine):
             mode.attach_wubi(_lexicon.wubi)  # type: ignore[union-attr]
             return mode
         if cls is EmojiMode:
-            return EmojiMode(_config)  # type: ignore[union-attr]
-        return LatinMode(_config)  # type: ignore[union-attr]
+            return EmojiMode(_config)
+        return LatinMode(_config)
 
     def set_mode(self, name: str) -> None:
         self._lazy_init()
@@ -93,7 +93,7 @@ class TuxEngine(IBus.Engine):
         self._refresh_preedit()
         self._update_chinese_prop()
 
-    def cycle_mode(self, *_args) -> bool:
+    def cycle_mode(self, *_args: object) -> bool:
         log.debug("cycle_mode handler entered")
         self._lazy_init()
         modes = list(ENGINES_BY_MODE.keys())
@@ -121,7 +121,7 @@ class TuxEngine(IBus.Engine):
 
     # ---- Shortcut handlers (bound to engine, called with engine arg) ----
 
-    def commit_first(self, *_args) -> bool:
+    def commit_first(self, *_args: object) -> bool:
         log.debug("commit_first handler entered")
         self._lazy_init()
         if not self._chinese_mode:
@@ -139,13 +139,13 @@ class TuxEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(result))
             # Learn: space commits the top candidate implicitly.
             # Route through add_user_word so persistence is triggered.
-            if self._config.dict.learn_enabled and self._lexicon:  # type: ignore[union-attr]
-                self._lexicon.add_user_word(buf, result)  # type: ignore[union-attr]
+            if self._config.dictionary.learn_enabled and self._lexicon:
+                self._lexicon.add_user_word(buf, result)
         self._active_mode.reset()
         self._refresh_preedit()
         return True
 
-    def select_candidate(self, index: int, *_args) -> bool:
+    def select_candidate(self, index: int, *_args: object) -> bool:
         log.debug("select_candidate(%d) handler entered", index)
         self._lazy_init()
         if not self._chinese_mode:
@@ -159,14 +159,14 @@ class TuxEngine(IBus.Engine):
             self.commit_text(IBus.Text.new_from_string(result.commit))
             # Learn: boost the selected entry so it ranks higher next time.
             # Route through add_user_word so persistence is triggered.
-            if self._config.dict.learn_enabled and self._lexicon and buf:
+            if self._config.dictionary.learn_enabled and self._lexicon and buf:
                 self._lexicon.add_user_word(buf, result.commit)
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
         return result.handled
 
-    def page_candidates(self, direction: int, *_args) -> bool:
+    def page_candidates(self, direction: int, *_args: object) -> bool:
         log.debug("page_candidates(%d) handler entered", direction)
         self._lazy_init()
         if not self._chinese_mode:
@@ -176,7 +176,7 @@ class TuxEngine(IBus.Engine):
         self._refresh_preedit()
         return True
 
-    def delete_left(self, *_args) -> bool:
+    def delete_left(self, *_args: object) -> bool:
         log.debug("delete_left handler entered, chinese_mode=%s buffer=%r",
                   self._chinese_mode,
                   self._active_mode.buffer if self._initialized else None)
@@ -195,7 +195,7 @@ class TuxEngine(IBus.Engine):
         log.debug("delete_left: chinese mode but empty buffer, pass-through")
         return False
 
-    def cancel_composition(self, *_args) -> bool:
+    def cancel_composition(self, *_args: object) -> bool:
         log.debug("cancel_composition handler entered")
         self._lazy_init()
         if not self._chinese_mode:
@@ -215,7 +215,7 @@ class TuxEngine(IBus.Engine):
     # In particular, do_enable() and do_property_activate() call user-defined
     # shortcut handlers which could raise; they MUST be isolated.
 
-    def do_focus_in(self) -> None:  # type: ignore[override]
+    def do_focus_in(self) -> None:
         try:
             self._do_focus_in_impl()
         except Exception:
@@ -229,7 +229,7 @@ class TuxEngine(IBus.Engine):
         self.register_properties(prop_list)
         log.debug("focus_in: done")
 
-    def do_focus_out(self) -> None:  # type: ignore[override]
+    def do_focus_out(self) -> None:
         try:
             self._do_focus_out_impl()
         except Exception:
@@ -239,7 +239,7 @@ class TuxEngine(IBus.Engine):
         log.debug("focus_out")
         self._commit_and_reset()
 
-    def do_reset(self) -> None:  # type: ignore[override]
+    def do_reset(self) -> None:
         try:
             self._do_reset_impl()
         except Exception:
@@ -249,7 +249,7 @@ class TuxEngine(IBus.Engine):
         log.debug("reset")
         self._commit_and_reset()
 
-    def do_enable(self) -> None:  # type: ignore[override]
+    def do_enable(self) -> None:
         try:
             self._do_enable_impl()
         except Exception:
@@ -270,7 +270,11 @@ class TuxEngine(IBus.Engine):
         Called from do_enable and whenever shortcut handlers need to be
         rebuilt (e.g. after a config hot-reload).
         """
-        s = _shortcuts  # type: ignore[union-attr]
+        # _shortcuts is guaranteed non-None here because this is only called
+        # from _do_enable_impl → do_enable, after _lazy_init() which returns
+        # early if _shortcuts is None.
+        s = _shortcuts
+        assert s is not None, "_shortcuts must be set"
         s.register("toggle_en_cn", self.toggle_chinese)
         s.register("commit_first", self.commit_first)
         s.register("delete_left", self.delete_left)
@@ -287,7 +291,7 @@ class TuxEngine(IBus.Engine):
                   "delete_left, cancel, clear_buffer, page_up, page_down, "
                   "cycle_mode, candidate_1..10 registered")
 
-    def do_disable(self) -> None:  # type: ignore[override]
+    def do_disable(self) -> None:
         try:
             self._do_disable_impl()
         except Exception:
@@ -302,7 +306,7 @@ class TuxEngine(IBus.Engine):
         _shortcuts.reset()  # type: ignore[union-attr]
         self._initialized = False
 
-    def do_property_activate(  # type: ignore[override]
+    def do_property_activate(
         self, prop_name: str, prop_state: int
     ) -> None:
         try:
@@ -322,10 +326,10 @@ class TuxEngine(IBus.Engine):
             self.toggle_chinese()
             return
 
-    def _select_n(self, index: int):
+    def _select_n(self, index: int) -> Callable[[object], bool]:
         return lambda *_a: self.select_candidate(index)
 
-    def do_process_key_event(  # type: ignore[override]
+    def do_process_key_event(
         self, keyval: int, keycode: int, state: int
     ) -> bool:
         # Filter key-release events up-front. IBus delivers both press and
@@ -412,7 +416,7 @@ class TuxEngine(IBus.Engine):
             self.hide_auxiliary_text()
             self.hide_lookup_table()
 
-    def _build_lookup(self, cands: list) -> IBus.LookupTable:
+    def _build_lookup(self, cands: list[Candidate]) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
         for c in cands:
             text = IBus.Text.new_from_string(c.display)
@@ -489,7 +493,7 @@ class TuxEngine(IBus.Engine):
     def _commit_and_reset(self) -> None:
         if not self._initialized:
             return
-        pending = self._active_mode.commit()  # type: ignore[union-attr]
+        pending = self._active_mode.commit()
         if pending:
             self.commit_text(IBus.Text.new_from_string(pending))
         self._active_mode.reset()

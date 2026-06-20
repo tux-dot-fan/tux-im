@@ -44,7 +44,7 @@ class WbpyMode:
     buffer: str
     cursor: int
 
-    def __init__(self, pinyin_trie: Trie, config) -> None:
+    def __init__(self, pinyin_trie: Trie, config: object) -> None:
         self._pinyin_mode = PinyinMode(pinyin_trie, config)
         # We share the wubi trie via a closure: the lexicon passes pinyin trie,
         # but the constructor also needs the wubi trie.  Wbpy is created with

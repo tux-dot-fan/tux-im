@@ -135,8 +135,8 @@ def test_lexicon_persist_roundtrip(tmp_path) -> None:
     # Create a minimal config-like object.
     user_path = tmp_path / "user_words.txt"
     mock_config = MagicMock()
-    mock_config.dict.search_paths = []          # no system dicts
-    mock_config.dict.user_words_path = str(user_path)
+    mock_config.dictionary.search_paths = []          # no system dicts
+    mock_config.dictionary.user_words_path = str(user_path)
 
     # First session: insert learned words.
     lex = Lexicon.load(mock_config)
@@ -148,8 +148,8 @@ def test_lexicon_persist_roundtrip(tmp_path) -> None:
 
     # Second session: same config, lexicon loads from disk.
     mock_config2 = MagicMock()
-    mock_config2.dict.search_paths = []
-    mock_config2.dict.user_words_path = str(user_path)
+    mock_config2.dictionary.search_paths = []
+    mock_config2.dictionary.user_words_path = str(user_path)
     lex2 = Lexicon.load(mock_config2)
 
     # User words from disk should be boosted (freq=10 and freq=5).
@@ -165,8 +165,8 @@ def test_lexicon_flush_atomic(tmp_path) -> None:
 
     user_path = tmp_path / "user_words.txt"
     mock_config = MagicMock()
-    mock_config.dict.search_paths = []
-    mock_config.dict.user_words_path = str(user_path)
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = str(user_path)
 
     lex = Lexicon.load(mock_config)
     lex.add_user_word("ni3", "你", freq=10)
@@ -186,8 +186,8 @@ def test_lexicon_flush_idempotent(tmp_path) -> None:
 
     user_path = tmp_path / "user_words.txt"
     mock_config = MagicMock()
-    mock_config.dict.search_paths = []
-    mock_config.dict.user_words_path = str(user_path)
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = "/nonexistent/path.txt"
 
     lex = Lexicon.load(mock_config)
     lex._dirty = False
@@ -200,8 +200,8 @@ def test_lexicon_flush_no_path() -> None:
     from unittest.mock import MagicMock
 
     mock_config = MagicMock()
-    mock_config.dict.search_paths = []
-    mock_config.dict.user_words_path = "/nonexistent/path.txt"
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = "/nonexistent/path.txt"
 
     lex = Lexicon.load(mock_config)
     lex._dirty = True

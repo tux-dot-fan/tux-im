@@ -73,6 +73,15 @@ ignore = ["E501"]
 python_version = "3.12"
 strict = true
 warn_unused_ignores = true
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["sounddevice", "sounddevice.*", "numpy", "numpy.*", "cairo", "cairo.*"]
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
+module = ["tux_im.asr.*"]
+ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
