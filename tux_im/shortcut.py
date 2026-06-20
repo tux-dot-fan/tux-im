@@ -136,6 +136,9 @@ class ShortcutManager:
 
     def handle(self, engine, keyval: int, state: int) -> bool:
         """Return True if the key was consumed by a shortcut."""
+        # IBus sends both press and release events.  We only handle presses
+        # here; the release side is filtered at the engine entry point, but
+        # we also guard here so shortcut handlers are never called on RELEASE.
         if state & IBus.ModifierType.RELEASE_MASK:
             return False
         for parsed, action in self._bindings:

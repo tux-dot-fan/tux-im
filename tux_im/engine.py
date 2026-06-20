@@ -126,10 +126,21 @@ class TuxEngine(IBus.Engine):
         if not self._active_mode.buffer:
             log.debug("commit_first: empty buffer, pass-through")
             return False
+        # Even if there are no visible candidates (preedit only), space
+        # should commit the top latent candidate from the active segment.
         result = self._active_mode.commit()
         log.info("commit_first: committed=%r", result)
         if result:
             self.commit_text(IBus.Text.new_from_string(result))
+            # Learn: space commits the top candidate implicitly.
+            if self._config.dict.learn_enabled and self._lexicon:
+                buf = self._active_mode.buffer
+                mode_name = self._active_mode.name
+                trie = (self._lexicon.pinyin if mode_name == "pinyin"
+                        else self._lexicon.wubi if mode_name in ("wubi", "wbpy")
+                        else None)
+                if trie is not None:
+                    trie.boost(buf, result)
         self._active_mode.reset()
         self._refresh_preedit()
         return True
@@ -144,6 +155,16 @@ class TuxEngine(IBus.Engine):
         log.info("select_candidate(%d): commit=%r handled=%s", index, result.commit, result.handled)
         if result.commit is not None:
             self.commit_text(IBus.Text.new_from_string(result.commit))
+            # Learn: boost the selected entry so it ranks higher next time.
+            if self._config.dict.learn_enabled and self._lexicon:
+                buf = self._active_mode.buffer
+                if buf:
+                    mode_name = self._active_mode.name
+                    trie = (self._lexicon.pinyin if mode_name == "pinyin"
+                            else self._lexicon.wubi if mode_name in ("wubi", "wbpy")
+                            else None)
+                    if trie is not None:
+                        trie.boost(buf, result.commit)
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
@@ -259,23 +280,30 @@ class TuxEngine(IBus.Engine):
                   keyval, keycode, state)
         try:
             return self._handle_key(keyval, state)
+        except (KeyboardInterrupt, SystemExit):
+            raise
         except Exception:  # pragma: no cover - defensive
             log.exception("Unhandled error processing key %d", keyval)
             self._commit_and_reset()
-            return False
+            # Return True so the key is NOT propagated to the application.
+            # An engine that dies silently is far better than one that
+            # leaks raw key events into unsuspecting apps.
+            return True
 
     # ---- Key handling ----
 
     def _handle_key(self, keyval: int, state: int) -> bool:
         self._lazy_init()
-        # 1. Check global shortcuts first.
-        consumed = _shortcuts.handle(self, keyval, state)  # type: ignore[union-attr]
-        if consumed:
-            return True
 
-        # 2. In Latin mode, let everything pass through.
+        # 1. In Latin mode, let everything pass through.
         if not self._chinese_mode:
             return False
+
+        # 2. Shortcuts first — space (commit_first), Escape (cancel), etc.
+        consumed = _shortcuts.handle(self, keyval, state)  # type: ignore[union-attr]
+        if consumed:
+            self._refresh_preedit()
+            return True
 
         # 3. Hand the key to the active input mode.
         result = self._active_mode.feed_key(keyval, state)

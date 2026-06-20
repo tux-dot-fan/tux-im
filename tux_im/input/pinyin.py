@@ -20,6 +20,26 @@ _PINYIN_KEYS = set("abcdefghijklmnopqrstuvwxyz")
 _TONE_KEYS = {"1", "2", "3", "4", "5"}
 _PINYIN_SEPARATORS = {" ", "'"}  # space and apostrophe split pinyin syllables
 
+# ASCII punctuation that auto-commits the current buffer AND converts to Chinese.
+# E.g. typing "wo" then "." commits "我。" in one shot.
+_ASCII_TO_CHINESE = {
+    ".": "\u3002",   # . -> 。
+    ",": "\uff0c",   # , -> ，
+    ";": "\uff1b",   # ; -> ；
+    ":": "\uff1a",   # : -> ：
+    "?": "\uff1f",   # ? -> ？
+    "!": "\uff01",   # ! -> ！
+    "<": "\u300a",   # < -> 《
+    ">": "\u300b",   # > -> 》
+    "(": "\uff08",   # ( -> （
+    ")": "\uff09",   # ) -> ）
+    "[": "\u3010",   # [ -> 【
+    "]": "\u3011",   # ] -> 】
+    "-": "\u2014",   # - -> — (em dash)
+    "'": "\u2019",   # ' -> ' (right single quote)
+    "\"": "\u201d",  # " -> " (right double quote)
+}
+
 
 class PinyinMode:
     """Buffers pinyin (with tone numbers) and looks up candidates in `PinyinTrie`.
@@ -66,6 +86,18 @@ class PinyinMode:
             self.cursor = len(self.buffer)
             log.debug("PinyinMode.feed_key: letter, buffer=%r", self.buffer)
             return KeyResult(handled=True)
+
+        # Punctuation: commit current buffer and convert to Chinese equivalent.
+        # Empty buffer -> pass through so the app gets the raw ASCII.
+        if len(ch) == 1 and ch in _ASCII_TO_CHINESE:
+            if not self.buffer:
+                return None
+            committed = self.commit() or ""
+            chinese = _ASCII_TO_CHINESE[ch]
+            log.debug("PinyinMode.feed_key: punct %r -> commit=%r + punct=%r",
+                      ch, committed, chinese)
+            self.reset()
+            return KeyResult(handled=True, commit=committed + chinese)
 
         return None
 
@@ -134,7 +166,7 @@ class PinyinMode:
     def candidates(self, limit: int = 9) -> list[Candidate]:
         """Show candidates for the *first* (incomplete) segment.
 
-连打 mode: the user is mid-typing a multi-syllable word. The first
+        连打 mode: the user is mid-typing a multi-syllable word. The first
         segment is still being entered; remaining segments are committed
         silently with their top candidate. Returns up to ``limit``
         candidates for the first segment.

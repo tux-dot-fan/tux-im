@@ -55,6 +55,23 @@ class Trie:
         # Keep entries sorted by frequency desc; insertion order as tiebreaker.
         node.entries.sort(key=lambda e: (-e.freq, e.word))
 
+    def boost(self, code: str, word: str, delta: int = 10) -> None:
+        """Increase the frequency of an existing (code, word) entry by delta.
+        If the entry does not exist this is a no-op."""
+        code = code.lower().strip()
+        node = self._root
+        for ch in code:
+            if ch not in node.children:
+                return
+            node = node.children[ch]
+        if not node.is_word:
+            return
+        for e in node.entries:
+            if e.word == word:
+                e.freq += delta
+                break
+        node.entries.sort(key=lambda e: (-e.freq, e.word))
+
     def has_prefix(self, prefix: str) -> bool:
         prefix = prefix.lower()
         node = self._root
