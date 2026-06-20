@@ -22,7 +22,12 @@ _PINYIN_SEPARATORS = {" ", "'"}  # space and apostrophe split pinyin syllables
 
 
 class PinyinMode:
-    """Buffers pinyin (with tone numbers) and looks up candidates in `PinyinTrie`."""
+    """Buffers pinyin (with tone numbers) and looks up candidates in `PinyinTrie`.
+
+    Supports "连打" (consecutive typing): the user types the full pinyin of a
+    multi-syllable word at once (e.g. ``nihao`` for "你好") and we segment
+    the buffer into syllables automatically on commit and selection.
+    """
 
     name = "pinyin"
     buffer: str
@@ -64,38 +69,109 @@ class PinyinMode:
 
         return None
 
-    def candidates(self, limit: int = 9) -> list[Candidate]:
-        if not self.buffer:
+    # ---- 连打 (consecutive typing) support ----
+
+    def segment(self, code: str) -> list[str]:
+        """Split a buffer like 'nihao' or 'ni3hao' into pinyin syllables.
+
+        Returns a list of segment codes (with their trailing tone digit
+        preserved). Uses greedy forward matching: at each position try the
+        longest prefix that is a valid pinyin code in the trie. The last
+        segment may be a partial code (still being typed) -- callers
+        should check ``has_prefix`` if they need to distinguish.
+        """
+        if not code:
             return []
-        entries = self._trie.lookup(self.buffer)
-        cands = [_entry_to_candidate(e) for e in entries]
-        return cands[self._page_offset : self._page_offset + limit]
+        # Strip a trailing tone digit and reattach it to the last segment.
+        tone = ""
+        body = code
+        if body and body[-1].isdigit():
+            tone = body[-1]
+            body = body[:-1]
 
-    def select(self, index: int) -> KeyResult:
-        cands = self.candidates(limit=9)
-        if 0 <= index < len(cands):
-            return KeyResult(handled=True, commit=cands[index].text, clear=True)
-        return KeyResult(handled=False)
-
-    def page(self, direction: int) -> KeyResult:
-        self._page_offset = max(0, self._page_offset + direction * 9)
-        return KeyResult(handled=True)
+        segments: list[str] = []
+        i = 0
+        n = len(body)
+        while i < n:
+            # Try the longest prefix first, then shrink until we find a
+            # valid code in the trie. Bail out when nothing matches.
+            for j in range(n, i, -1):
+                piece = body[i:j]
+                if self._trie.has_prefix(piece):
+                    segments.append(piece + (tone if j == n else ""))
+                    i = j
+                    break
+            else:
+                # No valid code starts at position i -- treat the next
+                # letter as its own (invalid) segment so we still make
+                # forward progress.
+                segments.append(body[i] + (tone if i + 1 == n else ""))
+                i += 1
+        if not segments:
+            return []
+        if tone and segments[-1][-1] != tone:
+            segments[-1] = segments[-1] + tone
+        return segments
 
     def commit(self) -> Optional[str]:
         if not self.buffer:
             return None
-        # First try to look up the buffer as a complete pinyin code.
-        entries = self._trie.lookup(self.buffer)
-        if entries:
-            return entries[0].word
-        # Fallback: strip trailing tone digit and try again so "ni3" → "你".
-        buf = self.buffer
-        if len(buf) > 1 and buf[-1].isdigit():
-            entries = self._trie.lookup(buf[:-1])
+        # 连打: split the buffer into syllables and concatenate the first
+        # candidate of each. 'nihao' -> ['ni', 'hao'] -> '你好'.
+        segments = self.segment(self.buffer)
+        parts: list[str] = []
+        for seg in segments:
+            # Strip trailing tone before lookup (trie keys are letters only).
+            body = seg[:-1] if seg and seg[-1].isdigit() else seg
+            entries = self._trie.lookup(body)
             if entries:
-                return entries[0].word
-        # Last resort: commit the raw buffer so the user doesn't lose input.
-        return self.buffer
+                parts.append(entries[0].word)
+            else:
+                # Unknown syllable -- fall back to raw so the user keeps it.
+                parts.append(seg)
+        return "".join(parts)
+
+    def candidates(self, limit: int = 9) -> list[Candidate]:
+        """Show candidates for the *first* (incomplete) segment.
+
+连打 mode: the user is mid-typing a multi-syllable word. The first
+        segment is still being entered; remaining segments are committed
+        silently with their top candidate. Returns up to ``limit``
+        candidates for the first segment.
+        """
+        if not self.buffer:
+            return []
+        segments = self.segment(self.buffer)
+        if not segments:
+            return []
+        first = segments[0]
+        body = first[:-1] if first and first[-1].isdigit() else first
+        entries = self._trie.lookup(body)
+        cands = [_entry_to_candidate(e) for e in entries]
+        return cands[self._page_offset : self._page_offset + limit]
+
+    def select(self, index: int) -> KeyResult:
+        """Select candidate for first segment, commit rest, return full text."""
+        if not self.buffer:
+            return KeyResult(handled=False)
+        segments = self.segment(self.buffer)
+        if not segments:
+            return KeyResult(handled=False)
+        first = segments[0]
+        body = first[:-1] if first and first[-1].isdigit() else first
+        entries = self._trie.lookup(body)
+        if not (0 <= index < len(entries)):
+            return KeyResult(handled=False)
+        parts = [entries[index].word]
+        for seg in segments[1:]:
+            b = seg[:-1] if seg and seg[-1].isdigit() else seg
+            tail = self._trie.lookup(b)
+            parts.append(tail[0].word if tail else seg)
+        return KeyResult(handled=True, commit="".join(parts), clear=True)
+
+    def page(self, direction: int) -> KeyResult:
+        self._page_offset = max(0, self._page_offset + direction * 9)
+        return KeyResult(handled=True)
 
 
 def _entry_to_candidate(e: LexEntry) -> Candidate:

@@ -315,9 +315,12 @@ class TuxEngine(IBus.Engine):
             )
             if cands:
                 self.update_lookup_table(self._build_lookup(cands), True)
+            else:
+                self.hide_lookup_table()
         else:
             self.hide_preedit_text()
             self.hide_auxiliary_text()
+            self.hide_lookup_table()
 
     def _build_lookup(self, cands: list) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
