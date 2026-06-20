@@ -20,6 +20,7 @@ log = logging.getLogger(__name__)
 class ParsedShortcut:
     modifiers: int  # IBus.ModifierType bitmask
     keyval: int
+    alt_keyval: int = 0  # Optional second keyval (e.g. opposite-case letter)
 
     def matches(self, keyval: int, state: int) -> bool:
         # Mask out lock keys (CapsLock, NumLock).
@@ -30,7 +31,11 @@ class ParsedShortcut:
             | IBus.ModifierType.SUPER_MASK
             | IBus.ModifierType.HYPER_MASK
         )
-        return self.keyval == keyval and (self.modifiers == relevant)
+        if self.modifiers != relevant:
+            return False
+        return keyval == self.keyval or (
+            self.alt_keyval != 0 and keyval == self.alt_keyval
+        )
 
 
 def parse_shortcut(spec: str) -> ParsedShortcut:
@@ -39,6 +44,11 @@ def parse_shortcut(spec: str) -> ParsedShortcut:
     Spec grammar: zero or more ``<Modifier>`` groups followed by a key name.
     Modifiers may appear in any order. Examples that parse identically:
         ``<Ctrl><Shift>m``  ``<Shift><Ctrl>m``  ``<Ctrl>m``  ``m``.
+
+    The keyval is looked up with the original case AND with the opposite case
+    so that ``<Ctrl><Shift>m`` matches both 'm' (77, the shifted keyval when
+    Shift is held) and 'm' (109, the unshifted keyval) -- but only when the
+    corresponding Shift modifier is also pressed.
     """
     import re
 
@@ -46,9 +56,6 @@ def parse_shortcut(spec: str) -> ParsedShortcut:
     if not spec:
         raise ValueError("empty shortcut spec")
 
-    # Split on the boundaries between modifier groups and the key name.
-    # A modifier group looks like ``<...>``; the key name is whatever
-    # remains at the end (possibly with no angle brackets).
     mod_pat = re.compile(r"<([^>]+)>")
     mods = 0
     pos = 0
@@ -72,11 +79,19 @@ def parse_shortcut(spec: str) -> ParsedShortcut:
 
     if keyname.lower() == "space":
         keyname = "space"
-    keyval = IBus.keyval_from_name(keyname)
-    if keyval == 0:
+
+    # Look up the keyval using both the original and the swapped-case name so
+    # the binding matches regardless of how Shift is reported in the state.
+    primary = IBus.keyval_from_name(keyname)
+    if primary == 0:
         raise ValueError(f"unknown key name: {keyname!r}")
 
-    return ParsedShortcut(mods, keyval)
+    if keyname.isalpha() and len(keyname) == 1:
+        swapped = keyname.swapcase()
+        secondary = IBus.keyval_from_name(swapped)
+        if secondary != 0:
+            return ParsedShortcut(mods, primary, secondary)
+    return ParsedShortcut(mods, primary)
 
 
 class ShortcutManager:
@@ -125,5 +140,6 @@ class ShortcutManager:
             return False
         for parsed, action in self._bindings:
             if parsed.matches(keyval, state):
+                log.debug("shortcut matched: action=%s keyval=%d", action, keyval)
                 return self._call_handler(action, engine)
         return False

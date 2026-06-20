@@ -235,8 +235,11 @@ class TuxEngine(IBus.Engine):
         self, prop_name: str, prop_state: int
     ) -> None:
         log.debug("do_property_activate: prop=%s state=%d", prop_name, prop_state)
-        if prop_name in ENGINES_BY_MODE:
-            self.set_mode(prop_name)
+        # Properties are registered with the "tux-im:<mode>" prefix; strip it
+        # so we can match against ENGINES_BY_MODE.
+        bare = prop_name.removeprefix("tux-im:")
+        if bare in ENGINES_BY_MODE:
+            self.set_mode(bare)
             return
         if prop_name == INPUT_MODE_PROP_KEY:
             self.toggle_chinese()
