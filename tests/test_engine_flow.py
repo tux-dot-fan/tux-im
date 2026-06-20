@@ -22,12 +22,10 @@ from tux_im.input.pinyin import PinyinMode
 from tux_im.input.wubi import WubiMode
 
 
-def _kv(char: str) -> int:
-    """Map an ASCII char to its Gdk keyval (for feeding keys)."""
-    import gi
-    gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk
-    return Gdk.unicode_to_keyval(ord(char))
+def _kv(c: str) -> int:
+    """Convert a character to a Gdk keyval (Gdk 3.0)."""
+    from gi.repository import Gdk  # noqa: N813
+    return Gdk.unicode_to_keyval(ord(c))
 
 
 class _FakeConfig:

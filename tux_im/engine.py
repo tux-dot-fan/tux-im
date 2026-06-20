@@ -11,6 +11,7 @@ gi.require_version("IBus", "1.0")
 from gi.repository import IBus  # noqa: E402
 
 from tux_im.input.base import KeyResult
+from tux_im.input.emoji import EmojiMode
 from tux_im.input.latin import LatinMode
 from tux_im.input.pinyin import PinyinMode
 from tux_im.input.wbpy import WbpyMode
@@ -31,6 +32,7 @@ ENGINES_BY_MODE: dict[str, type] = {
     "pinyin": PinyinMode,
     "wubi": WubiMode,
     "wbpy": WbpyMode,
+    "emoji": EmojiMode,
 }
 
 
@@ -80,6 +82,8 @@ class TuxEngine(IBus.Engine):
             mode = WbpyMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
             mode.attach_wubi(_lexicon.wubi)  # type: ignore[union-attr]
             return mode
+        if cls is EmojiMode:
+            return EmojiMode(_config)  # type: ignore[union-attr]
         return LatinMode(_config)  # type: ignore[union-attr]
 
     def set_mode(self, name: str) -> None:
@@ -478,7 +482,7 @@ class TuxEngine(IBus.Engine):
             mode_name = self._active_mode.name
         except AttributeError:
             return "CN"
-        return {"pinyin": "拼", "wubi": "五", "wbpy": "混"}.get(mode_name, "CN")
+        return {"pinyin": "拼", "wubi": "五", "wbpy": "混", "emoji": "表"}.get(mode_name, "CN")
 
     # ---- Commit / reset ----
 
