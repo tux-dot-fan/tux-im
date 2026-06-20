@@ -79,6 +79,10 @@ def main() -> int:
         # Rebuild lexicon in case dict paths changed.
         try:
             new_lexicon = Lexicon.load(new_config)
+            # Flush pending user words from the old lexicon before swapping it
+            # out, so any learned words accumulated during the session are
+            # persisted before the new lexicon starts loading from disk.
+            engine_module._lexicon._flush_now()
             engine_module._lexicon = new_lexicon
             log.info("Lexicon reloaded: pinyin=%d, wubi=%d",
                      len(new_lexicon.pinyin), len(new_lexicon.wubi))

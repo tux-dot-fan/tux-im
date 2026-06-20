@@ -133,14 +133,9 @@ class TuxEngine(IBus.Engine):
         if result:
             self.commit_text(IBus.Text.new_from_string(result))
             # Learn: space commits the top candidate implicitly.
+            # Route through add_user_word so persistence is triggered.
             if self._config.dict.learn_enabled and self._lexicon:
-                buf = self._active_mode.buffer
-                mode_name = self._active_mode.name
-                trie = (self._lexicon.pinyin if mode_name == "pinyin"
-                        else self._lexicon.wubi if mode_name in ("wubi", "wbpy")
-                        else None)
-                if trie is not None:
-                    trie.boost(buf, result)
+                self._lexicon.add_user_word(buf, result)
         self._active_mode.reset()
         self._refresh_preedit()
         return True
@@ -151,20 +146,16 @@ class TuxEngine(IBus.Engine):
         if not self._chinese_mode:
             log.debug("select_candidate(%d): not chinese mode, pass-through", index)
             return False
+        # Capture buffer before select() clears it.
+        buf = self._active_mode.buffer
         result = self._active_mode.select(index)
         log.info("select_candidate(%d): commit=%r handled=%s", index, result.commit, result.handled)
         if result.commit is not None:
             self.commit_text(IBus.Text.new_from_string(result.commit))
             # Learn: boost the selected entry so it ranks higher next time.
-            if self._config.dict.learn_enabled and self._lexicon:
-                buf = self._active_mode.buffer
-                if buf:
-                    mode_name = self._active_mode.name
-                    trie = (self._lexicon.pinyin if mode_name == "pinyin"
-                            else self._lexicon.wubi if mode_name in ("wubi", "wbpy")
-                            else None)
-                    if trie is not None:
-                        trie.boost(buf, result.commit)
+            # Route through add_user_word so persistence is triggered.
+            if self._config.dict.learn_enabled and self._lexicon and buf:
+                self._lexicon.add_user_word(buf, result.commit)
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
