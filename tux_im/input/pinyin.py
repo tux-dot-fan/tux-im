@@ -169,9 +169,9 @@ class PinyinMode:
         segments = self.segment(self.buffer)
         parts: list[str] = []
         for seg in segments:
-            # Strip trailing tone before lookup (trie keys are letters only).
-            body = seg[:-1] if seg and seg[-1].isdigit() else seg
-            entries = self._trie.lookup(body)
+            # Trie keys include the tone digit (ni3, hao3).  Pass the full
+            # syllable so the correct entry is found.
+            entries = self._trie.lookup(seg)
             if entries:
                 parts.append(entries[0].word)
             else:
@@ -193,8 +193,9 @@ class PinyinMode:
         if not segments:
             return []
         first = segments[0]
-        body = first[:-1] if first and first[-1].isdigit() else first
-        entries = self._trie.lookup(body)
+        # Trie keys include the tone digit (ni3, hao3).  Pass the full
+        # syllable to lookup so the correct entry is found.
+        entries = self._trie.lookup(first)
         cands = [_entry_to_candidate(e) for e in entries]
         return cands[self._page_offset : self._page_offset + limit]
 
@@ -206,14 +207,14 @@ class PinyinMode:
         if not segments:
             return KeyResult(handled=False)
         first = segments[0]
-        body = first[:-1] if first and first[-1].isdigit() else first
-        entries = self._trie.lookup(body)
+        # Trie keys include the tone digit (ni3, hao3).  Pass the full
+        # syllable so the correct entry is found.
+        entries = self._trie.lookup(first)
         if not (0 <= index < len(entries)):
             return KeyResult(handled=False)
         parts = [entries[index].word]
         for seg in segments[1:]:
-            b = seg[:-1] if seg and seg[-1].isdigit() else seg
-            tail = self._trie.lookup(b)
+            tail = self._trie.lookup(seg)
             parts.append(tail[0].word if tail else seg)
         return KeyResult(handled=True, commit="".join(parts), clear=True)
 

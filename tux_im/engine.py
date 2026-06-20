@@ -128,14 +128,15 @@ class TuxEngine(IBus.Engine):
             return False
         # Even if there are no visible candidates (preedit only), space
         # should commit the top latent candidate from the active segment.
+        buf = self._active_mode.buffer
         result = self._active_mode.commit()
         log.info("commit_first: committed=%r", result)
         if result:
             self.commit_text(IBus.Text.new_from_string(result))
             # Learn: space commits the top candidate implicitly.
             # Route through add_user_word so persistence is triggered.
-            if self._config.dict.learn_enabled and self._lexicon:
-                self._lexicon.add_user_word(buf, result)
+            if self._config.dict.learn_enabled and self._lexicon:  # type: ignore[union-attr]
+                self._lexicon.add_user_word(buf, result)  # type: ignore[union-attr]
         self._active_mode.reset()
         self._refresh_preedit()
         return True
@@ -205,8 +206,18 @@ class TuxEngine(IBus.Engine):
         return False
 
     # ---- IBus lifecycle hooks ----
+    # Every public IBus callback that can be called by the daemon is wrapped
+    # in its own try/except so a crash in one hook cannot kill the daemon.
+    # In particular, do_enable() and do_property_activate() call user-defined
+    # shortcut handlers which could raise; they MUST be isolated.
 
     def do_focus_in(self) -> None:  # type: ignore[override]
+        try:
+            self._do_focus_in_impl()
+        except Exception:
+            log.exception("do_focus_in crashed")
+
+    def _do_focus_in_impl(self) -> None:
         log.debug("focus_in: registering properties")
         self._lazy_init()
         prop_list = self._build_prop_list()
@@ -215,36 +226,70 @@ class TuxEngine(IBus.Engine):
         log.debug("focus_in: done")
 
     def do_focus_out(self) -> None:  # type: ignore[override]
+        try:
+            self._do_focus_out_impl()
+        except Exception:
+            log.exception("do_focus_out crashed")
+
+    def _do_focus_out_impl(self) -> None:
         log.debug("focus_out")
         self._commit_and_reset()
 
     def do_reset(self) -> None:  # type: ignore[override]
+        try:
+            self._do_reset_impl()
+        except Exception:
+            log.exception("do_reset crashed")
+
+    def _do_reset_impl(self) -> None:
         log.debug("reset")
         self._commit_and_reset()
 
     def do_enable(self) -> None:  # type: ignore[override]
+        try:
+            self._do_enable_impl()
+        except Exception:
+            log.exception("do_enable crashed")
+
+    def _do_enable_impl(self) -> None:
         log.debug("enable: registering shortcut handlers")
         self._lazy_init()
         # Register all shortcut handlers.  Clearing first makes enable
         # idempotent (can be called multiple times without duplication).
         _shortcuts.reset()  # type: ignore[union-attr]
-        _shortcuts.register("toggle_en_cn", self.toggle_chinese)  # type: ignore[union-attr]
-        _shortcuts.register("commit_first", self.commit_first)  # type: ignore[union-attr]
-        _shortcuts.register("delete_left", self.delete_left)  # type: ignore[union-attr]
-        _shortcuts.register("cancel", self.cancel_composition)  # type: ignore[union-attr]
-        _shortcuts.register("clear_buffer", self.cancel_composition)  # type: ignore[union-attr]
-        _shortcuts.register("page_up", lambda *_a: self.page_candidates(-1))  # type: ignore[union-attr]
-        _shortcuts.register("page_down", lambda *_a: self.page_candidates(1))  # type: ignore[union-attr]
-        _shortcuts.register("cycle_mode", self.cycle_mode)  # type: ignore[union-attr]
+        self._register_shortcut_handlers()
+        log.debug("enable: shortcut handlers registered")
+
+    def _register_shortcut_handlers(self) -> None:
+        """Register every engine shortcut handler with the global ShortcutManager.
+
+        Called from do_enable and whenever shortcut handlers need to be
+        rebuilt (e.g. after a config hot-reload).
+        """
+        s = _shortcuts  # type: ignore[union-attr]
+        s.register("toggle_en_cn", self.toggle_chinese)
+        s.register("commit_first", self.commit_first)
+        s.register("delete_left", self.delete_left)
+        s.register("cancel", self.cancel_composition)
+        s.register("clear_buffer", self.cancel_composition)
+        s.register("page_up", lambda *_a: self.page_candidates(-1))
+        s.register("page_down", lambda *_a: self.page_candidates(1))
+        s.register("cycle_mode", self.cycle_mode)
         for i in range(9):
-            _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))  # type: ignore[union-attr]
+            s.register(f"candidate_{i + 1}", self._select_n(i))
         # "0" selects the 10th candidate (Rime/FCITX convention).
-        _shortcuts.register("candidate_10", self._select_n(9))  # type: ignore[union-attr]
-        log.debug("enable: registered handlers for toggle_en_cn, commit_first, "
+        s.register("candidate_10", self._select_n(9))
+        log.debug("_register_shortcut_handlers: toggle_en_cn, commit_first, "
                   "delete_left, cancel, clear_buffer, page_up, page_down, "
-                  "cycle_mode, candidate_1..10")
+                  "cycle_mode, candidate_1..10 registered")
 
     def do_disable(self) -> None:  # type: ignore[override]
+        try:
+            self._do_disable_impl()
+        except Exception:
+            log.exception("do_disable crashed")
+
+    def _do_disable_impl(self) -> None:
         log.debug("disable: committing composition and clearing shortcuts")
         self._commit_and_reset()
         # Remove all shortcut handlers so they don't fire when the engine
@@ -256,6 +301,12 @@ class TuxEngine(IBus.Engine):
     def do_property_activate(  # type: ignore[override]
         self, prop_name: str, prop_state: int
     ) -> None:
+        try:
+            self._do_property_activate_impl(prop_name, prop_state)
+        except Exception:
+            log.exception("do_property_activate crashed")
+
+    def _do_property_activate_impl(self, prop_name: str, prop_state: int) -> None:
         log.debug("do_property_activate: prop=%s state=%d", prop_name, prop_state)
         # Properties are registered with the "tux-im:<mode>" prefix; strip it
         # so we can match against ENGINES_BY_MODE.
