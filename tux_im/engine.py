@@ -303,7 +303,13 @@ class TuxEngine(IBus.Engine):
         cands = self._active_mode.candidates(_config.ime.max_candidates)  # type: ignore[union-attr]
 
         if buf or cands:
-            preedit = f"[{self._active_mode.name}] {buf}" if buf else f"[{self._active_mode.name}]"
+            # Preedit shows the typed buffer; auxiliary text shows a status
+            # badge (mode + buffer + candidate count + top candidate) so the
+            # user always has a place to look, even when no IBus panel runs.
+            mode_name = self._active_mode.name
+            status = f"[{mode_name}] {buf}" if buf else f"[{mode_name}]"
+            if cands:
+                status = f"{status}  \u2192  {cands[0].text}  ({len(cands)})"
             self.update_preedit_text_with_mode(
                 IBus.Text.new_from_string(buf),
                 self._active_mode.cursor,
@@ -311,7 +317,7 @@ class TuxEngine(IBus.Engine):
                 IBus.PreeditFocusMode.COMMIT,
             )
             self.update_auxiliary_text(
-                IBus.Text.new_from_string(preedit), False,
+                IBus.Text.new_from_string(status), False,
             )
             if cands:
                 self.update_lookup_table(self._build_lookup(cands), True)

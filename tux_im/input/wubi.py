@@ -43,11 +43,18 @@ class WubiMode:
         if key is None:
             return None
         ch = key.lower()
-        if len(ch) == 1 and ch in _WUBI_KEYS and len(self.buffer) < _MAX_WUBI_LEN:
-            self.buffer += ch
-            self.cursor = len(self.buffer)
-            return KeyResult(handled=True)
-        return None
+        if len(ch) != 1 or ch not in _WUBI_KEYS or len(self.buffer) >= _MAX_WUBI_LEN:
+            return None
+        # Check whether the buffer (after appending) is at least a prefix of
+        # some wubi code. If not -- and especially if we have no buffer at all
+        # yet -- this key would never resolve to a candidate, so return
+        # handled=False to let it pass through to the app as a plain letter.
+        new_buf = self.buffer + ch
+        if not self._trie.has_prefix(new_buf):
+            return None
+        self.buffer = new_buf
+        self.cursor = len(self.buffer)
+        return KeyResult(handled=True)
 
     def candidates(self, limit: int = 9) -> list[Candidate]:
         if not self.buffer:
