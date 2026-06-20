@@ -103,6 +103,11 @@ class PinyinMode:
 
     # ---- 连打 (consecutive typing) support ----
 
+    # Valid single-character pinyin initials (v=u for ü) and finals.
+    # If has_prefix fails we fall back to these so single-letter input
+    # like "a" or "i" is still treated as a valid partial pinyin syllable.
+    _SINGLE_LETTER_PINYIN = {"a", "o", "e", "i", "u", "v"}
+
     def segment(self, code: str) -> list[str]:
         """Split a buffer like 'nihao' or 'ni3hao' into pinyin syllables.
 
@@ -127,18 +132,29 @@ class PinyinMode:
         while i < n:
             # Try the longest prefix first, then shrink until we find a
             # valid code in the trie. Bail out when nothing matches.
+            found = False
             for j in range(n, i, -1):
                 piece = body[i:j]
                 if self._trie.has_prefix(piece):
                     segments.append(piece + (tone if j == n else ""))
                     i = j
+                    found = True
                     break
-            else:
-                # No valid code starts at position i -- treat the next
-                # letter as its own (invalid) segment so we still make
-                # forward progress.
-                segments.append(body[i] + (tone if i + 1 == n else ""))
-                i += 1
+            if not found:
+                # No valid pinyin starts at position i. If it's a single
+                # letter that looks like a pinyin vowel/initial, treat it
+                # as a valid partial syllable so the user can type one
+                # letter at a time. Otherwise treat the letter as an
+                # invalid segment (user made a typo).
+                ch = body[i]
+                if ch.lower() in self._SINGLE_LETTER_PINYIN:
+                    segments.append(ch + (tone if i + 1 == n else ""))
+                    i += 1
+                else:
+                    # Skip one character and keep trying; this prevents
+                    # the loop from spinning forever on bad input.
+                    segments.append(ch)
+                    i += 1
         if not segments:
             return []
         if tone and segments[-1][-1] != tone:

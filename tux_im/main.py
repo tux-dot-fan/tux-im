@@ -60,6 +60,48 @@ def main() -> int:
     engine_module._lexicon = lexicon
     engine_module._shortcuts = shortcuts
 
+    # ---- Config hot-reload via GLib file monitor ----
+
+    def _reload_config(_file_obj: GLib.File, _other_file: GLib.File,
+                      event_type: GLib.FileMonitorEvent,
+                      _user_data=None) -> None:
+        """Called by GLib when config.toml changes on disk."""
+        if event_type not in (GLib.FileMonitorEvent.CHANGES_DONE_HINT,
+                              GLib.FileMonitorEvent.CREATED):
+            return
+        log.info("Config file changed, reloading...")
+        try:
+            new_config = Config.load(config.path)
+        except Exception:
+            log.exception("Failed to reload config, keeping old one")
+            return
+        engine_module._config = new_config
+        # Rebuild lexicon in case dict paths changed.
+        try:
+            new_lexicon = Lexicon.load(new_config)
+            engine_module._lexicon = new_lexicon
+            log.info("Lexicon reloaded: pinyin=%d, wubi=%d",
+                     len(new_lexicon.pinyin), len(new_lexicon.wubi))
+        except Exception:
+            log.exception("Failed to reload lexicon, keeping old one")
+            engine_module._lexicon = lexicon
+        # Rebuild shortcuts in case keybindings changed.
+        try:
+            new_shortcuts = ShortcutManager(new_config)
+            engine_module._shortcuts = new_shortcuts
+            log.info("Shortcuts rebuilt from new config")
+        except Exception:
+            log.exception("Failed to rebuild shortcuts, keeping old ones")
+            engine_module._shortcuts = shortcuts
+
+    monitor = config.path.parent.watch_file(config.path.name, GLib.PRIORITY_DEFAULT,
+                                           _reload_config, None)
+    if monitor is not None:
+        log.info("Watching %s for changes", config.path)
+    else:
+        log.warning("Could not set up file monitor for %s -- config hot-reload disabled",
+                    config.path)
+
     # Connect to ibus-daemon via the session bus.  IBus.init() is auto-called
     # by the python-ibus override on import.
     log.info("Connecting to IBus bus...")

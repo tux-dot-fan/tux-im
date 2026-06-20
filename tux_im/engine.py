@@ -234,23 +234,31 @@ class TuxEngine(IBus.Engine):
     def do_enable(self) -> None:  # type: ignore[override]
         log.debug("enable: registering shortcut handlers")
         self._lazy_init()
-        _shortcuts.register("toggle_en_cn", self.toggle_chinese)
-        _shortcuts.register("commit_first", self.commit_first)
-        _shortcuts.register("delete_left", self.delete_left)
-        _shortcuts.register("cancel", self.cancel_composition)
-        _shortcuts.register("clear_buffer", self.cancel_composition)
-        _shortcuts.register("page_up", lambda *_a: self.page_candidates(-1))
-        _shortcuts.register("page_down", lambda *_a: self.page_candidates(1))
-        _shortcuts.register("cycle_mode", self.cycle_mode)
+        # Register all shortcut handlers.  Clearing first makes enable
+        # idempotent (can be called multiple times without duplication).
+        _shortcuts.reset()  # type: ignore[union-attr]
+        _shortcuts.register("toggle_en_cn", self.toggle_chinese)  # type: ignore[union-attr]
+        _shortcuts.register("commit_first", self.commit_first)  # type: ignore[union-attr]
+        _shortcuts.register("delete_left", self.delete_left)  # type: ignore[union-attr]
+        _shortcuts.register("cancel", self.cancel_composition)  # type: ignore[union-attr]
+        _shortcuts.register("clear_buffer", self.cancel_composition)  # type: ignore[union-attr]
+        _shortcuts.register("page_up", lambda *_a: self.page_candidates(-1))  # type: ignore[union-attr]
+        _shortcuts.register("page_down", lambda *_a: self.page_candidates(1))  # type: ignore[union-attr]
+        _shortcuts.register("cycle_mode", self.cycle_mode)  # type: ignore[union-attr]
         for i in range(9):
-            _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))
+            _shortcuts.register(f"candidate_{i + 1}", self._select_n(i))  # type: ignore[union-attr]
         log.debug("enable: registered handlers for toggle_en_cn, commit_first, "
                   "delete_left, cancel, clear_buffer, page_up, page_down, "
                   "cycle_mode, candidate_1..9")
 
     def do_disable(self) -> None:  # type: ignore[override]
-        log.debug("disable")
+        log.debug("disable: committing composition and clearing shortcuts")
         self._commit_and_reset()
+        # Remove all shortcut handlers so they don't fire when the engine
+        # is inactive.  This also prevents a crash if the engine is destroyed
+        # while still active (ibus may call disable before destroy).
+        _shortcuts.reset()  # type: ignore[union-attr]
+        self._initialized = False
 
     def do_property_activate(  # type: ignore[override]
         self, prop_name: str, prop_state: int

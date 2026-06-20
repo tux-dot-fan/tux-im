@@ -107,6 +107,14 @@ class ShortcutManager:
         """Register a handler for a named shortcut action."""
         self._handlers[action] = handler
 
+    def unregister(self, action: str) -> None:
+        """Remove the handler for `action`. Silently succeeds if not registered."""
+        self._handlers.pop(action, None)
+
+    def reset(self) -> None:
+        """Remove all registered handlers. Used on engine disable."""
+        self._handlers.clear()
+
     def _call_handler(self, action: str, engine) -> bool:
         """Call the registered handler. Return True if the key was consumed."""
         handler = self._handlers.get(action)
