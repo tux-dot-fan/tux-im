@@ -84,7 +84,7 @@ module = ["tux_im.asr.*"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
-module = ["tux_im.input.google_pinyin"]
+module = ["tux_im.input.google_pinyin", "tux_im.input.google_pinyin_mode"]
 ignore_errors = true
 
 [tool.pytest.ini_options]
