@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import gi
+
+gi.require_version("IBus", "1.0")
+from gi.repository import IBus  # noqa: E402
+
 from tux_im.input.lexicon import Trie
 from tux_im.input.wbpy import WbpyMode
 
@@ -11,22 +16,14 @@ class _FakeConfig:
         max_candidates = 9
 
 
-def _letter(val):
-    import gi
-
-    gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk
-
-    return Gdk.unicode_to_keyval(ord(val))
+def _letter(val: str) -> int:
+    """Map an ascii char to its IBus keyval (no Gdk needed)."""
+    return IBus.keyval_from_name(val)
 
 
-def _digit(val):
-    import gi
-
-    gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk
-
-    return Gdk.unicode_to_keyval(ord(val))
+def _digit(val: str) -> int:
+    """Map an ascii digit char to its IBus keyval."""
+    return IBus.keyval_from_name(val)
 
 
 def test_wbpy_merges_candidates() -> None:

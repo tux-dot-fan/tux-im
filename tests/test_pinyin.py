@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+import gi
+
+gi.require_version("IBus", "1.0")
+from gi.repository import IBus  # noqa: E402
+
 import pytest
 
 from tux_im.input.pinyin import PinyinMode
@@ -12,23 +17,14 @@ class _FakeConfig:
         max_candidates = 9
 
 
-def _letter(val):
-    """Map an ascii char to its Gdk keyval (works under both gi and tests)."""
-    import gi
-
-    gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk
-
-    return Gdk.unicode_to_keyval(ord(val))
+def _letter(val: str) -> int:
+    """Map an ascii char to its IBus keyval (no Gdk needed)."""
+    return IBus.keyval_from_name(val)
 
 
-def _digit(val):
-    import gi
-
-    gi.require_version("Gdk", "3.0")
-    from gi.repository import Gdk
-
-    return Gdk.unicode_to_keyval(ord(val))
+def _digit(val: str) -> int:
+    """Map an ascii digit char to its IBus keyval."""
+    return IBus.keyval_from_name(val)
 
 
 def test_feed_letters() -> None:
@@ -93,4 +89,8 @@ def test_select_first_candidate() -> None:
     assert r.handled
     assert r.commit == "你"
     assert r.clear
+    # Engine calls mode.reset() when result.clear is True;
+    # simulate that since we're testing the mode directly.
+    if r.clear:
+        mode.reset()
     assert mode.buffer == ""

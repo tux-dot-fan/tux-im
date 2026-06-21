@@ -73,7 +73,9 @@ class WbpyMode:
         if key is None:
             return None
         ch = key.lower()
-        if len(ch) != 1 or not ch.isalpha():
+        # Determine likely mode based on the current buffer.
+        # Accept digits even if isalpha is False (tone markers for pinyin).
+        if len(ch) != 1 or (not ch.isalpha() and ch not in "12345"):
             return None
 
         # Determine likely mode based on the current buffer.
@@ -88,9 +90,12 @@ class WbpyMode:
         if self._looks_like_pinyin(self.buffer):
             self._pinyin_mode.buffer = self.buffer
             res = self._pinyin_mode.feed_key(keyval, state)
+            # Always sync wbpy buffer from pinyin buffer after feeding the key.
+            # This is necessary because pinyin may append tone digits (res=None)
+            # but still update its internal buffer (e.g. "ni" + "3" -> "ni3").
+            self.buffer = self._pinyin_mode.buffer
+            self.cursor = len(self.buffer)
             if res and res.handled:
-                self.buffer = self._pinyin_mode.buffer
-                self.cursor = len(self.buffer)
                 return res
         return None
 

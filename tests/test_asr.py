@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
-
-import httpx
 import pytest
-import respx
 
-from tux_im.asr.client import ASRClient, ASRError
+# respx is required for mocking HTTP calls; skip the whole module if it's not installed
+pytest.importorskip("respx")
+
+import httpx  # noqa: E402
+
+from tux_im.asr.client import ASRClient, ASRError  # noqa: E402
 
 
 @pytest.mark.asyncio
@@ -20,8 +20,8 @@ async def test_transcribe_success() -> None:
         model="whisper-1",
         language="zh",
     )
-    with respx.mock(base_url="https://api.example.com") as mock:
-        route = mock.post("/transcribe").mock(
+    with pytest.respx.mock(base_url="https://api.example.com") as mock:
+        mock.post("/transcribe").mock(
             return_value=httpx.Response(200, json={"text": "你好世界"})
         )
         result = await client.transcribe(b"fake-audio-bytes")
@@ -42,7 +42,7 @@ async def test_transcribe_api_error() -> None:
         endpoint="https://api.example.com/transcribe",
         api_key="sk-test",
     )
-    with respx.mock(base_url="https://api.example.com") as mock:
+    with pytest.respx.mock(base_url="https://api.example.com") as mock:
         mock.post("/transcribe").mock(return_value=httpx.Response(401, text="bad key"))
         with pytest.raises(ASRError):
             await client.transcribe(b"x")

@@ -86,12 +86,20 @@ def parse_shortcut(spec: str) -> ParsedShortcut:
     if primary == 0:
         raise ValueError(f"unknown key name: {keyname!r}")
 
+    # IBus returns 0xffffff for invalid key names that aren't actual keysyms.
+    # Validate by round-trip: the round-tripped name must match the input.
+    # (IBus.keyval_from_name returns 0xffffff for garbage, which round-trips to "0xffffff")
+    if IBus.keyval_name(primary) != keyname:
+        raise ValueError(f"unknown key name: {keyname!r}")
+
+    # Swap-case secondary: for alpha keys, also match the opposite shift state.
+    secondary = 0
     if keyname.isalpha() and len(keyname) == 1:
-        swapped = keyname.swapcase()
-        secondary = IBus.keyval_from_name(swapped)
-        if secondary != 0:
-            return ParsedShortcut(mods, primary, secondary)
-    return ParsedShortcut(mods, primary)
+        swapped = IBus.keyval_from_name(keyname.swapcase())
+        if swapped != 0:
+            secondary = swapped
+
+    return ParsedShortcut(mods, primary, secondary)
 
 
 class ShortcutManager:
