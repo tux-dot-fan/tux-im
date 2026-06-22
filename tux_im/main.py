@@ -32,7 +32,7 @@ def main() -> int:
 
         gi.require_version("GObject", "2.0")
         gi.require_version("IBus", "1.0")
-        from gi.repository import GLib, GObject, IBus  # noqa: F401
+        from gi.repository import GLib, Gio, GObject, IBus  # noqa: F401
     except (ImportError, ValueError) as exc:
         log.error("IBus/GObject introspection not available: %s", exc)
         log.error("Install: sudo apt install python3-gi python3-ibus-1.0")
@@ -62,12 +62,12 @@ def main() -> int:
 
     # ---- Config hot-reload via GLib file monitor ----
 
-    def _reload_config(_file_obj: GLib.File, _other_file: GLib.File,
-                      event_type: GLib.FileMonitorEvent,
-                      _user_data: object | None = None) -> None:
+    def _reload_config(_monitor: Gio.FileMonitor, _file_obj: Gio.File,
+                      _other_file: Gio.File | None,
+                      event_type: Gio.FileMonitorEvent) -> None:
         """Called by GLib when config.toml changes on disk."""
-        if event_type not in (GLib.FileMonitorEvent.CHANGES_DONE_HINT,
-                              GLib.FileMonitorEvent.CREATED):
+        if event_type not in (Gio.FileMonitorEvent.CHANGES_DONE_HINT,
+                              Gio.FileMonitorEvent.CREATED):
             return
         log.info("Config file changed, reloading...")
         try:
@@ -99,9 +99,10 @@ def main() -> int:
             log.exception("Failed to rebuild shortcuts, keeping old ones")
             engine_module._shortcuts = shortcuts
 
-    gfile = GLib.file_new_for_path(str(config.path))
-    monitor = gfile.monitor_file(GLib.PRIORITY_DEFAULT, _reload_config, None)
+    gfile = Gio.File.new_for_path(str(config.path))
+    monitor = gfile.monitor_file(Gio.FileMonitorFlags.NONE, None)
     if monitor is not None:
+        monitor.connect("changed", _reload_config)
         log.info("Watching %s for changes", config.path)
     else:
         log.warning("Could not set up file monitor for %s -- config hot-reload disabled",

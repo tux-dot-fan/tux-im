@@ -48,7 +48,14 @@ Documentation = "https://github.com/tux-im/tux-im/tree/main/docs"
 Issues = "https://github.com/tux-im/tux-im/issues"
 
 [tool.setuptools]
-packages = ["tux_im", "tux_im.input", "tux_im.asr", "tux_im.ui", "tux_im.config"]
+packages = [
+    "tux_im",
+    "tux_im.input",
+    "tux_im.input.lexicon",
+    "tux_im.asr",
+    "tux_im.ui",
+    "tux_im.config",
+]
 include-package-data = true
 
 [tool.setuptools.package-data]
