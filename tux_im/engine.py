@@ -416,10 +416,24 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             self.hide_auxiliary_text()
             self.hide_lookup_table()
 
+    # Gray color (0xRRGGBB) for comment annotation — muted but readable.
+    _COMMENT_COLOR: int = 0x808080
+
     def _build_lookup(self, cands: list[Candidate]) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
         for c in cands:
-            text = IBus.Text.new_from_string(c.display)
+            display = c.display
+            text = IBus.Text.new_from_string(display)
+            if c.comment:
+                # Append comment in gray after the word.
+                comment_str = f"\t{c.comment}"
+                text.append_attribute(
+                    IBus.AttrType.FOREGROUND,
+                    self._COMMENT_COLOR,
+                    len(display),
+                    len(display) + len(comment_str),
+                )
+                text.append_text(comment_str)
             table.append_candidate(text)
         return table
 
