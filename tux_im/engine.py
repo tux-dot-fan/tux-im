@@ -197,9 +197,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             # English mode: pass BackSpace to the app.
             log.debug("delete_left: english mode, pass-through")
             return False
-        if self._active_mode.buffer:
-            self._active_mode.buffer = self._active_mode.buffer[:-1]
-            self._active_mode.cursor = len(self._active_mode.buffer)
+        if self._active_mode.backspace():
             self._refresh_preedit()
             log.debug("delete_left: buffer=%r", self._active_mode.buffer)
             return True

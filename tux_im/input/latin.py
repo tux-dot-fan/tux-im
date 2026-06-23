@@ -56,6 +56,12 @@ class LatinMode:
     def page(self, direction: int) -> KeyResult:
         return KeyResult(handled=False)
 
+    def backspace(self) -> bool:
+        # LatinMode has no buffer to delete from — it never accepts
+        # input.  Returning False signals the engine to pass BackSpace
+        # through to the focused app.
+        return False
+
     def full_sentence(self) -> None:
         """No sentence-level decoding."""
         return None

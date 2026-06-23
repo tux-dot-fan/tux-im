@@ -1,3 +1,22 @@
+tux-im (0.1.0-6) resolute; urgency=medium
+
+  * fix(wbpy): backspace actually deletes characters.  The old
+    engine-level code in delete_left() chopped the visible buffer
+    by one character, but in wbpy mode the wubi and pinyin
+    sub-engines maintain their own internal buffers; backspace
+    only affected the visible mirror, so the next keypress caused
+    the deleted character to "come back" via the sub-engines'
+    accumulated state.  Now adds a backspace() method to the
+    InputMode protocol; pinyin/wubi/google/emoji modes get the
+    default implementation (chop self.buffer); WbpyMode overrides
+    it to delegate to the pinyin engine (which correctly rolls
+    back the google pinyin decoder state) and re-derive the wubi
+    buffer from the new visible state.  Adds 3 regression tests
+    covering: backspace pops the visible buffer; backspace rolls
+    back both sub-engines; backspace on empty returns False.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 11:05:00 +0000
+
 tux-im (0.1.0-5) resolute; urgency=medium
 
   * fix(main): Ctrl+C now actually quits the engine.  The old code

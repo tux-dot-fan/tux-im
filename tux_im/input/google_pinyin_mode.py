@@ -466,3 +466,27 @@ class GooglePinyinMode:
     def page(self, direction: int) -> KeyResult:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
+
+    def backspace(self) -> bool:
+        # GooglePinyinMode keeps coupled state: visible buffer, the
+        # remaining_pinyin fed to the libgooglepinyin decoder, and any
+        # locked text from previous choose() calls.  The simplest
+        # correct strategy on backspace is to reset the decoder and
+        # re-feed the truncated buffer.  Backspace is rare; correctness
+        # > incremental efficiency.
+        if not self.buffer:
+            return False
+        new_buf = self.buffer[:-1]
+        if self.cursor > 0:
+            self.cursor -= 1
+        self._dec.reset()
+        self._cumulative_fixed = 0
+        self._fixed_text = ""
+        self._remaining_pinyin = new_buf
+        self.buffer = new_buf
+        if new_buf:
+            self._total_cands = self._dec.search(new_buf)
+        else:
+            self._total_cands = 0
+        self._page_offset = 0
+        return True

@@ -203,3 +203,22 @@ class InputMode(Protocol):
     def full_sentence(self) -> Optional[str]:
         """Return full decoded sentence.  See class docstring for details."""
         ...
+
+    def backspace(self) -> bool:
+        """Delete one character from the user's input.
+
+        Modes that maintain multiple internal buffers (e.g. wbpy, which
+        keeps the wubi half and the pinyin half in sync) MUST override
+        this so that deleting from the visible buffer also rolls back
+        the right amount in every sub-engine.
+
+        The default implementation in :class:`InputMode` is to chop
+        ``self.buffer`` by one character — this is correct for modes
+        where the visible buffer is the sole source of state
+        (pinyin, wubi, google, latin, emoji).
+
+        Returns True if a character was actually deleted, False if the
+        buffer is already empty (in which case the engine will pass
+        BackSpace through to the focused app).
+        """
+        ...

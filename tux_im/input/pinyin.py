@@ -222,6 +222,14 @@ class PinyinMode:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
 
+    def backspace(self) -> bool:
+        if not self.buffer:
+            return False
+        self.buffer = self.buffer[:-1]
+        if self.cursor > 0:
+            self.cursor -= 1
+        return True
+
     def full_sentence(self) -> str | None:
         """No sentence-level decoding; return None."""
         return None

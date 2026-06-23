@@ -113,3 +113,55 @@ def test_wbpy_tone_digit_does_not_corrupt_wubi() -> None:
     cands = mode.candidates()
     texts = [c.text for c in cands]
     assert "我" in texts, f"wubi cand lost after pinyin+tone: {texts}"
+
+
+def test_wbpy_backspace_pops_visible_buffer() -> None:
+    """Backspace must shrink the visible buffer by one."""
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+    for ch in "abc":
+        mode.feed_key(_letter(ch), 0)
+    assert mode.buffer == "abc"
+    assert mode.backspace() is True
+    assert mode.buffer == "ab"
+
+
+def test_wbpy_backspace_rolls_back_wubi_and_pinyin() -> None:
+    """The user-reported bug: backspace appeared to do nothing because
+    the wubi and pinyin sub-engines kept their own internal buffers
+    and the next feed_key re-concatenated the deleted character.
+    After backspace, both sub-engine buffers must be in lockstep
+    with the visible buffer.
+    """
+    pinyin = Trie()
+    wubi = Trie()
+    wubi.insert("kld", "我", 100)
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+    for ch in "kld":
+        mode.feed_key(_letter(ch), 0)
+    assert mode.buffer == "kld"
+    # User reports the bug: now press backspace.
+    assert mode.backspace() is True
+    assert mode.buffer == "kl"
+    # Now type more letters.  Without the fix, the wubi engine's
+    # buffer was still "kld" so the next 'a' would make "klda" and
+    # be visible as if the 'd' had never been deleted.
+    mode.feed_key(_letter("a"), 0)
+    assert mode.buffer == "kla", f"buffer leaked old char: {mode.buffer!r}"
+    # And the wubi engine should be queried with "kla" not "klda".
+    assert mode._wubi_mode is not None
+    assert mode._wubi_mode.buffer == "kla"
+    # Pinyin engine in lockstep.
+    assert mode._pinyin_mode is not None
+    assert mode._pinyin_mode.buffer == "kla"
+
+
+def test_wbpy_backspace_empty_returns_false() -> None:
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+    assert mode.backspace() is False

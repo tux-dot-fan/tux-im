@@ -103,20 +103,32 @@ class WbpyMode:
         is_tone = ch in "12345"
         wubi_handled = False
         pinyin_handled = False
-        # Letter: feed to BOTH engines in parallel.  We do NOT route to
-        # one based on a heuristic — the whole point of wbpy is to show
-        # BOTH candidate lists at once.
-        # Tone digit: feed to pinyin only.  The wubi engine's buffer is
-        # NOT advanced; it continues tracking just the letters so far.
-        if not is_tone and self._wubi_mode is not None:
-            res = self._wubi_mode.feed_key(keyval, state)
-            wubi_handled = bool(res and res.handled)
-        # Always feed the pinyin engine — both letters and tone digits.
-        res = self._pinyin_mode.feed_key(keyval, state)
-        pinyin_handled = bool(res and res.handled)
-        # The visible buffer mirrors the pinyin engine's buffer, which
-        # is the authoritative representation of "what the user typed"
-        # (including any tone digit the wubi half ignored).
+        # The pinyin engine is the source of truth for the visible
+        # buffer (it accepts letters AND tone digits, returns a
+        # full-sentence candidate).  We let it own its own buffer
+        # via its own feed_key.  The wubi engine's buffer is a
+        # derived view that is RESET every time a tone digit
+        # appears in the input: wubi codes never contain digits, so
+        # a tone digit marks the end of the previous wubi attempt
+        # and the start of a new one (or just a pinyin segment).
+        # This way "ni3kld" → wubi buffer is "kld", not "nikld".
+        if self._pinyin_mode is not None:
+            res = self._pinyin_mode.feed_key(keyval, state)
+            pinyin_handled = bool(res and res.handled)
+        if self._wubi_mode is not None:
+            if is_tone:
+                # Tone digit: wubi segment boundary.  Reset wubi
+                # buffer to empty so the next letter starts a new
+                # wubi code.
+                self._wubi_mode.buffer = ""
+            else:
+                # Letter: append to the wubi buffer.  We assign
+                # directly rather than calling wubi.feed_key so
+                # the 4-char cap and prefix-validity checks do not
+                # cause the two halves to drift out of sync.
+                self._wubi_mode.buffer += ch
+            wubi_handled = True
+        # The visible buffer mirrors the pinyin engine's buffer.
         self.buffer = self._pinyin_mode.buffer
         self.cursor = len(self.buffer)
         if wubi_handled or pinyin_handled:
@@ -156,6 +168,43 @@ class WbpyMode:
     def page(self, direction: int) -> KeyResult:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
+
+    def backspace(self) -> bool:
+        """Delete one character from the user's input.
+
+        In wbpy mode the pinyin sub-engine owns the visible buffer
+        and the google pinyin decoder state.  The wubi sub-engine's
+        buffer is a derived view: every letter after the last tone
+        digit (or all letters if there is no tone digit yet).
+        We delegate the backspace to the pinyin engine — it
+        correctly rolls back its own buffer AND resets/re-feeds
+        the decoder — and then re-derive the wubi buffer from the
+        new visible state.
+        """
+        if not self.buffer:
+            return False
+        # Let the pinyin engine handle the actual buffer + decoder
+        # rollback.  It returns False when the buffer is already
+        # empty (defensive — should not happen since we just
+        # checked).
+        if self._pinyin_mode is not None and not self._pinyin_mode.backspace():
+            return False
+        # Update visible cursor/buffer from pinyin engine.
+        self.buffer = self._pinyin_mode.buffer
+        self.cursor = len(self.buffer)
+        # Re-derive the wubi engine's buffer: the segment of the
+        # visible buffer that follows the LAST tone digit (or the
+        # whole buffer if no tone digit has been typed).  This
+        # matches the rule used in feed_key so the two stay in
+        # sync after backspace.
+        if self._wubi_mode is not None:
+            buf = self.buffer
+            last_tone_idx = max(
+                (i for i, c in enumerate(buf) if c in "12345"),
+                default=-1,
+            )
+            self._wubi_mode.buffer = buf[last_tone_idx + 1:]
+        return True
 
     def full_sentence(self) -> Optional[str]:
         """Return the text that will be committed on space: the top entry
