@@ -59,9 +59,10 @@ def test_merge_list_str_accepts_list_of_str() -> None:
 def test_merge_list_str_rejects_list_of_int() -> None:
     d = _merge(DictSection(), {"search_paths": [1, 2]})  # type: ignore[list-item]
     # Inner type check fails; field keeps its default.
+    import os
     assert d.search_paths == [
         "/usr/share/rime-data",
-        "/home/dean/.config/tux-im/dicts",
+        f"{os.path.expanduser('~')}/.config/tux-im/dicts",
         "./data",
     ]
 

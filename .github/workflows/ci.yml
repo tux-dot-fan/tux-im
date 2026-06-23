@@ -34,12 +34,16 @@ jobs:
       - name: Install system dependencies
         # python3-gi / ibus headers are required to import tux_im (gi.repository)
         # at test time.  librime-data-* provides the wubi/pinyin dictionaries
-        # that the lexicon tests load against.
+        # that the lexicon tests load against.  libgooglepinyin0-dev provides
+        # /usr/lib/x86_64-linux-gnu/libgooglepinyin.so, which GooglePinyinMode
+        # loads at import time; without it every wbpy test crashes with
+        # FileNotFoundError before any assertion runs.
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             ibus \
             ibus-data \
+            libgooglepinyin0-dev \
             librime-data-wubi \
             librime-data-luna-pinyin \
             librime-data-terra-pinyin \
