@@ -204,12 +204,17 @@ def _merge(dataclass_obj: Any, data: dict[str, Any]) -> Any:
     if not isinstance(data, dict):
         return dataclass_obj
     valid = {}
-    schema = asdict(dataclass_obj)
+    # Use the dataclass type's __dataclass_fields__ to introspect declared
+    # field types.  We must NOT use asdict() here — asdict returns the
+    # *values* of each field, not its declared type, and the isinstance
+    # check below needs the type.  This bug crashed config loading on
+    # startup with: TypeError: isinstance() arg 2 must be a type, ...
+    fields = dataclass_obj.__dataclass_fields__
     for k, v in data.items():
-        if k not in schema:
+        if k not in fields:
             log.debug("_merge: unknown field %r, ignoring", k)
             continue
-        expected_type = schema[k]
+        expected_type = fields[k].type
         # Unwrap Optional[T] (get_origin == Union, get_args gives (T, NoneType)).
         origin = get_origin(expected_type)
         if origin is type(None):
