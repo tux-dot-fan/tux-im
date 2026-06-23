@@ -352,8 +352,8 @@ class GooglePinyinMode:
             # typed) but stop sending it to the decoder past a safe
             # length.  im_set_max_lens caps at 30 already but the
             # crash happens earlier for degenerate inputs.
-            _MAX_DECODE_LEN = 16
-            if len(self.buffer) <= _MAX_DECODE_LEN:
+            _max_decode_len = 16
+            if len(self.buffer) <= _max_decode_len:
                 self._remaining_pinyin += ch
                 self._page_offset = 0
                 self._total_cands = self._dec.search(self._remaining_pinyin)

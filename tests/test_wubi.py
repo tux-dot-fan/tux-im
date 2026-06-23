@@ -12,8 +12,10 @@ from tux_im.input.wubi import WubiMode
 
 
 class _FakeConfig:
-    class ime:
+    class Ime:
         max_candidates = 9
+
+    ime = Ime
 
 
 def _letter(val: str) -> int:

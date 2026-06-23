@@ -25,7 +25,7 @@ def test_parse_multiple_modifiers() -> None:
 
 
 def test_parse_invalid() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="empty shortcut spec"):
         parse_shortcut("")
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="unknown key name"):
         parse_shortcut("NotAKeyName12345")

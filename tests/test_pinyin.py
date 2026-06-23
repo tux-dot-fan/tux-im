@@ -11,8 +11,11 @@ from tux_im.input.pinyin import PinyinMode
 
 
 class _FakeConfig:
-    class ime:
+    class Ime:
         max_candidates = 9
+
+    # Re-expose under lowercase to mirror the production Config dot-path.
+    ime = Ime
 
 
 def _letter(val: str) -> int:

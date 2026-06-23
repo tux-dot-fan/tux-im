@@ -18,7 +18,7 @@ from __future__ import annotations
 import atexit
 import logging
 import os
-from collections.abc import Callable, Iterable, Iterator
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import IO, TYPE_CHECKING

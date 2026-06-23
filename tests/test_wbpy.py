@@ -21,8 +21,10 @@ from tux_im.input.wbpy import WbpyMode
 
 
 class _FakeConfig:
-    class ime:
+    class Ime:
         max_candidates = 9
+
+    ime = Ime
 
 
 def _letter(val: str) -> int:

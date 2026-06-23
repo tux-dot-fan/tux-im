@@ -28,14 +28,20 @@ def _kv(c: str) -> int:
 class _FakeConfig:
     """Minimal config that the input modes and lexicon need."""
 
-    class ime:
+    class Ime:
         max_candidates = 9
         learn_enabled = True
 
-    class dict:
+    class Dict:
         user_words_path = "/dev/null"
-        search_paths = []
+        search_paths = []  # noqa: RUF012
         learn_enabled = True
+
+    # Tests use the lowercase attribute names `cfg.ime` and `cfg.dict` to
+    # mirror the original Config dataclass dot-path.  Re-expose the
+    # CapWords classes under those lowercase names.
+    ime = Ime
+    dict = Dict  # noqa: A001
 
 
 # ---------------------------------------------------------------------------

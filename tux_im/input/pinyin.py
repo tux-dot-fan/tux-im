@@ -105,7 +105,7 @@ class PinyinMode:
     # Valid single-character pinyin initials (v=u for ü) and finals.
     # If has_prefix fails we fall back to these so single-letter input
     # like "a" or "i" is still treated as a valid partial pinyin syllable.
-    _SINGLE_LETTER_PINYIN = {"a", "o", "e", "i", "u", "v"}
+    _SINGLE_LETTER_PINYIN = {"a", "o", "e", "i", "u", "v"}  # noqa: RUF012
 
     def segment(self, code: str) -> list[str]:
         """Split a buffer like 'nihao' or 'ni3hao' into pinyin syllables.
