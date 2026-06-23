@@ -38,14 +38,27 @@ _WUBI_FIRST_KEY_HINTS = set("ghklmnotvy")
 class WbpyMode:
     """Mixed Wubi + Google Pinyin input mode (86 wubi + google pinyin).
 
-    In wbpy mode the buffer is fed to BOTH engines in parallel:
-      - the wubi engine treats the buffer as a wubi code
-      - the google pinyin engine treats the buffer as a pinyin string
-    The two candidate lists are merged (wubi first, then pinyin,
-    deduplicated by text) and shown in the lookup table.  The auxiliary
-    text area displays what will be committed on space (the top entry of
-    the merged list, or the full google pinyin sentence when one is
-    available).
+    In wbpy mode every key is fed to BOTH engines in parallel — we do NOT
+    pick one.  This is the whole point of wbpy: the user might be mid-way
+    through typing a wubi code that happens to also be valid pinyin
+    (e.g. "gg" — wubi 码位 + "gg" 拼音无意义，但前几个字母常有歧义)
+    and we want the lookup table to show BOTH candidate lists at once.
+
+    The two engines have very different buffer semantics:
+      - Wubi is 1-4 ASCII letters.  Tone digits (1-5) are NOT valid wubi
+        codes — the wubi engine rejects them.
+      - Google Pinyin is 1-6 letters, optionally followed by a single
+        tone digit.  Tone digits ARE part of the pinyin buffer.
+
+    To avoid the two buffers fighting each other, we maintain the
+    ``self.buffer`` (what the user sees) but the engines have their own
+    internal buffers that we never overwrite from outside.  After each
+    key we update ``self.buffer`` to the *union* of what was added:
+      - If the key was a letter: append to both engines' buffers.
+      - If the key was a tone digit (1-5): append to the pinyin buffer
+        only; do NOT touch the wubi buffer.
+      - The visible buffer is the pinyin buffer (which includes the
+        tone digit) so the user can see their input reflected.
     """
 
     name = "wbpy"
@@ -56,12 +69,13 @@ class WbpyMode:
         # The pinyin half is ALWAYS the Google Pinyin full-sentence decoder.
         from tux_im.input.google_pinyin_mode import GooglePinyinMode
         self._pinyin_mode: InputMode = GooglePinyinMode(pinyin_trie, config)
-        # We share the wubi trie via a closure: the lexicon passes pinyin trie,
-        # but the constructor also needs the wubi trie.  Wbpy is created with
-        # a single trie arg from the engine; in practice the engine passes the
-        # pinyin trie.  We accept a wubi trie via attribute injection in engine.
+        # Wubi half is injected by the engine via attach_wubi() because the
+        # engine has both tries available at construction time.
         self._wubi_mode: WubiMode | None = None
         self._config = config
+        # The visible buffer (what the user sees in the preedit area) is
+        # the pinyin engine's buffer — it includes tone digits and is the
+        # source of truth for "what the user typed".
         self.buffer = ""
         self.cursor = 0
         self._page_offset = 0
@@ -83,46 +97,44 @@ class WbpyMode:
         if key is None:
             return None
         ch = key.lower()
-        # Determine likely mode based on the current buffer.
-        # Accept digits even if isalpha is False (tone markers for pinyin).
         if len(ch) != 1 or (not ch.isalpha() and ch not in "12345"):
             return None
 
-        # Determine likely mode based on the current buffer.
-        if self._looks_like_wubi(self.buffer) and self._wubi_mode:
-            self._wubi_mode.buffer = self.buffer
+        is_tone = ch in "12345"
+        wubi_handled = False
+        pinyin_handled = False
+        # Letter: feed to BOTH engines in parallel.  We do NOT route to
+        # one based on a heuristic — the whole point of wbpy is to show
+        # BOTH candidate lists at once.
+        # Tone digit: feed to pinyin only.  The wubi engine's buffer is
+        # NOT advanced; it continues tracking just the letters so far.
+        if not is_tone and self._wubi_mode is not None:
             res = self._wubi_mode.feed_key(keyval, state)
-            if res and res.handled:
-                self.buffer = self._wubi_mode.buffer
-                self.cursor = len(self.buffer)
-                return res
-            # Fall through to pinyin if wubi rejected (e.g. > 4 chars).
-        if self._looks_like_pinyin(self.buffer):
-            self._pinyin_mode.buffer = self.buffer
-            res = self._pinyin_mode.feed_key(keyval, state)
-            # Always sync wbpy buffer from pinyin buffer after feeding the key.
-            # This is necessary because pinyin may append tone digits (res=None)
-            # but still update its internal buffer (e.g. "ni" + "3" -> "ni3").
-            self.buffer = self._pinyin_mode.buffer
-            self.cursor = len(self.buffer)
-            if res and res.handled:
-                return res
+            wubi_handled = bool(res and res.handled)
+        # Always feed the pinyin engine — both letters and tone digits.
+        res = self._pinyin_mode.feed_key(keyval, state)
+        pinyin_handled = bool(res and res.handled)
+        # The visible buffer mirrors the pinyin engine's buffer, which
+        # is the authoritative representation of "what the user typed"
+        # (including any tone digit the wubi half ignored).
+        self.buffer = self._pinyin_mode.buffer
+        self.cursor = len(self.buffer)
+        if wubi_handled or pinyin_handled:
+            return KeyResult(handled=True)
         return None
 
     def candidates(self, limit: int = 9) -> list[Candidate]:
         if not self.buffer:
             return []
+        # In wbpy mode we always query BOTH engines.  The wubi engine's
+        # own buffer tracks only letters (tone digits are not fed to it),
+        # so it stays valid even when the visible buffer contains tones.
         wubi_cands: list[Candidate] = []
-        pinyin_cands: list[Candidate] = []
-        if self._wubi_mode and self._looks_like_wubi(self.buffer):
-            self._wubi_mode.buffer = self.buffer
+        if self._wubi_mode is not None and self._wubi_mode.buffer:
             wubi_cands = self._wubi_mode.candidates(limit)
-        if self._looks_like_pinyin(self.buffer):
-            self._pinyin_mode.buffer = self.buffer
-            pinyin_cands = self._pinyin_mode.candidates(limit)
-        # Wubi first if buffer ends in a wubi-shaped code; otherwise pinyin first.
+        pinyin_cands = self._pinyin_mode.candidates(limit)
+        # Wubi candidates first, then pinyin candidates, dedup by text.
         merged = wubi_cands + pinyin_cands
-        # Deduplicate by text, keep first occurrence.
         seen: set[str] = set()
         unique: list[Candidate] = []
         for c in merged:

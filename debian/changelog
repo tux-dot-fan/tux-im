@@ -1,3 +1,18 @@
+tux-im (0.1.0-4) resolute; urgency=medium
+
+  * fix(wbpy): actually feed keys to BOTH wubi and google pinyin
+    engines in parallel.  The old code did a serial fallback (try
+    wubi first; if it handled the key, return without ever asking
+    pinyin) so most pinyin candidates were never shown.  Now every
+    letter is fed to both engines; tone digits (1-5) go to pinyin
+    only and do not advance the wubi buffer, so wubi decoding stays
+    correct across pinyin-with-tone inputs.  Visible buffer mirrors
+    the pinyin engine's buffer (the authoritative representation
+    including any tone digit).  Adds 4 regression tests in
+    tests/test_wbpy.py.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 10:50:00 +0000
+
 tux-im (0.1.0-3) resolute; urgency=medium
 
   * fix(config): _merge must handle PEP 563 forward-ref annotations and
