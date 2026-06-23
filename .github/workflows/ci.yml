@@ -47,15 +47,15 @@ jobs:
             python3-ibus-1.0 \
             python3-tomli-w \
             python3-pytest \
-            python3-pytest-asyncio \
-            python3-respx
+            python3-pytest-asyncio
 
       - name: Install lint/type-check tools
         run: |
           python -m pip install --upgrade pip
           python -m pip install \
             "mypy>=1.7" \
-            "ruff>=0.1"
+            "ruff>=0.1" \
+            "respx>=0.21"
 
       - name: Ruff (lint)
         run: ruff check .
@@ -97,9 +97,6 @@ jobs:
             python3-gi \
             python3-ibus-1.0 \
             python3-tomli-w \
-            python3-pytest \
-            python3-pytest-asyncio \
-            python3-respx \
             librime-data-wubi \
             librime-data-luna-pinyin \
             librime-data-terra-pinyin
