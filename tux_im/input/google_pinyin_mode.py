@@ -343,10 +343,20 @@ class GooglePinyinMode:
         # Letter: accumulate in pinyin buffer
         if len(ch) == 1 and ch.isalpha():
             self.buffer += ch
-            self._remaining_pinyin += ch
-            self._page_offset = 0
-            self._total_cands = self._dec.search(self._remaining_pinyin)
             self.cursor = len(self.buffer)
+            # Cap the pinyin string fed to the decoder.  19+ letters of
+            # the same consonant crashes libgooglepinyin's
+            # MatrixSearch::extend_dmi (assertion failure → SIGABRT →
+            # process core dump).  Keep the buffer growing in the
+            # visible sense (so the user can still see what they
+            # typed) but stop sending it to the decoder past a safe
+            # length.  im_set_max_lens caps at 30 already but the
+            # crash happens earlier for degenerate inputs.
+            _MAX_DECODE_LEN = 16
+            if len(self.buffer) <= _MAX_DECODE_LEN:
+                self._remaining_pinyin += ch
+                self._page_offset = 0
+                self._total_cands = self._dec.search(self._remaining_pinyin)
             log.debug(
                 "GooglePinyinMode.feed_key: %r, buffer=%r, cands=%d",
                 ch, self.buffer, self._total_cands,

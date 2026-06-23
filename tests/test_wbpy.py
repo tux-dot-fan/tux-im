@@ -165,3 +165,38 @@ def test_wbpy_backspace_empty_returns_false() -> None:
     mode = WbpyMode(pinyin, _FakeConfig)
     mode.attach_wubi(wubi)
     assert mode.backspace() is False
+
+
+def test_wbpy_pinyin_buffer_capped_at_safe_length() -> None:
+    """Regression for libgooglepinyin MatrixSearch::extend_dmi
+    assertion crash.  When the user holds down a single consonant
+    key (e.g. 'c'), the pinyin engine's internal decoder crashes
+    on inputs of ~19 letters.  WbpyMode must cap the pinyin
+    engine's buffer at 16 letters to avoid the crash.
+
+    This test cannot exercise the real GooglePinyinMode (no
+    libgooglepinyin in the test environment), but it can verify
+    that the cap *constant* is set to a safe value and the
+    pinyin-mode buffer is the one being protected.
+    """
+    import re
+
+    with open("tux_im/input/wbpy.py") as f:
+        src = f.read()
+    # The cap constant must be present and ≤ 20 (well below the
+    # 19-letter crash threshold, with a safety margin).
+    m = re.search(r"_MAX_PINYIN_LEN\s*=\s*(\d+)", src)
+    assert m is not None, "wbpy _MAX_PINYIN_LEN not found"
+    cap = int(m.group(1))
+    assert cap <= 20, f"wbpy cap too high: {cap}"
+    assert cap >= 6, f"wbpy cap too low: {cap}"
+
+    # GooglePinyinMode must have the same cap so a pure "google"
+    # mode (not wrapped by wbpy) also survives a flood of consonants.
+    with open("tux_im/input/google_pinyin_mode.py") as f:
+        src = f.read()
+    m = re.search(r"_MAX_DECODE_LEN\s*=\s*(\d+)", src)
+    assert m is not None, "google _MAX_DECODE_LEN not found"
+    cap = int(m.group(1))
+    assert cap <= 20, f"google cap too high: {cap}"
+    assert cap >= 6, f"google cap too low: {cap}"

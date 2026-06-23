@@ -1,3 +1,20 @@
+tux-im (0.1.0-8) resolute; urgency=medium
+
+  * fix(google_pinyin, wbpy): cap pinyin buffer to avoid
+    libgooglepinyin crash.  19+ consecutive consonants in the
+    pinyin buffer (e.g. a user holding down 'c') crashed
+    MatrixSearch::extend_dmi with "Assertion `0 != handles[0]'
+    failed" → SIGABRT → process core dump.  im_set_max_lens(30,
+    50) was insufficient: the crash happens earlier for
+    degenerate all-consonant inputs.  Now cap the pinyin engine
+    buffer at 16 letters in both GooglePinyinMode.feed_key and
+    WbpyMode.feed_key.  The visible buffer keeps growing (so
+    the user can see what they typed) but the decoder is no
+    longer called with the over-length string.  Adds a
+    regression test that pins the cap constant in both files.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 11:20:00 +0000
+
 tux-im (0.1.0-7) resolute; urgency=medium
 
   * fix(engine): hide the lookup table when entering English mode.

@@ -112,6 +112,32 @@ class WbpyMode:
         # a tone digit marks the end of the previous wubi attempt
         # and the start of a new one (or just a pinyin segment).
         # This way "ni3kld" → wubi buffer is "kld", not "nikld".
+        #
+        # Length cap: 19 consecutive "c" crashes libgooglepinyin's
+        # internal MatrixSearch with assertion failure.  The
+        # library's own im_set_max_lens caps at 30 but a single
+        # all-consonant buffer of ~19 letters still trips an
+        # internal assert in dict match.  Cap the pinyin engine's
+        # buffer at 16 (a reasonable pinyin sentence length: ~6
+        # letters per syllable × 2-3 syllables).
+        _MAX_PINYIN_LEN = 16
+        if (
+            self._pinyin_mode is not None
+            and len(self._pinyin_mode.buffer) >= _MAX_PINYIN_LEN
+            and not is_tone
+        ):
+            # Reject the letter — don't pass it to the pinyin
+            # engine.  Still update the wubi half so the candidate
+            # panel doesn't go stale.
+            if self._wubi_mode is not None:
+                if is_tone:
+                    self._wubi_mode.buffer = ""
+                else:
+                    self._wubi_mode.buffer += ch
+                wubi_handled = True
+            self.buffer = self._pinyin_mode.buffer
+            self.cursor = len(self.buffer)
+            return KeyResult(handled=wubi_handled)
         if self._pinyin_mode is not None:
             res = self._pinyin_mode.feed_key(keyval, state)
             pinyin_handled = bool(res and res.handled)
