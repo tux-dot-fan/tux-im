@@ -1,3 +1,21 @@
+tux-im (0.1.0-11) resolute; urgency=medium
+
+  * ci: drop python3-sounddevice from Build-Depends (noble repo
+    does not ship it; runtime-only dependency of the optional ASR
+    module — moved to Depends only, not Build-Depends).  This unblocks
+    `dpkg-buildpackage` in CI which previously errored with
+    "Unmet build dependencies: python3-sounddevice".
+  * ci: install libgooglepinyin0-dev in the test job so GooglePinyinMode
+    can dlopen /usr/lib/x86_64-linux-gnu/libgooglepinyin.so at import
+    time; otherwise every wbpy integration test crashes with
+    FileNotFoundError before any assertion runs.
+  * ci: install build-essential so dpkg-buildpackage can compile the
+    python3-gi build-time C glue, and python3-httpx for the httpx
+    Build-Depends already declared in debian/control.
+  * test(config): use os.path.expanduser('~') instead of the hardcoded
+    /home/dean/... path so the test passes on a CI runner with a
+    different $HOME.
+
 tux-im (0.1.0-10) resolute; urgency=medium
 
   * fix(lexicon): parse 4-column Rime dict lines so single-letter

@@ -168,7 +168,6 @@ jobs:
             python3-gi \
             python3-httpx \
             python3-ibus-1.0 \
-            python3-sounddevice \
             python3-tomli-w \
             librime-data-wubi \
             librime-data-luna-pinyin \

@@ -10,7 +10,6 @@ Build-Depends: debhelper-compat (= 13),
                python3-ibus-1.0,
                python3-tomli-w,
                python3-httpx,
-               python3-sounddevice,
 Standards-Version: 4.7.0
 Homepage: https://github.com/tux-im/tux-im
 Rules-Requires-Root: no
