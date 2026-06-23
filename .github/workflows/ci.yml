@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   # ---------------------------------------------------------------------
@@ -70,6 +70,72 @@ jobs:
           /usr/bin/python3 -m pytest tests/ \
             --tb=short \
             -v
+
+  # ---------------------------------------------------------------------
+  # 1b. Auto-fix lint debt (separate job so the test job's pass/fail is
+  #     independent of whether the project is currently ruff-clean).
+  #     On push to main only: run `ruff check --fix --unsafe-fixes`,
+  #     commit any resulting changes, and push them back.  This keeps
+  #     main ruff-clean without requiring every contributor to fix all
+  #     150+ unused-import / unused-noqa / import-sort issues by hand.
+  # ---------------------------------------------------------------------
+  lint-fix:
+    name: Auto-fix lint debt
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # Serialise fix jobs so two simultaneous pushes don't race on
+    # `git push` to main.  The cancel-in-progress pattern is fine
+    # because the commit is idempotent.
+    concurrency:
+      group: lint-fix-main
+      cancel-in-progress: true
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install ruff
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "ruff>=0.1"
+
+      - name: Auto-fix lint debt
+        # --fix            : apply safe fixes (unused imports, import sort,
+        #                    unused noqa, etc.)
+        # --unsafe-fixes   : also apply the small set of unsafe fixes ruff
+        #                    refuses by default (e.g. UP037 quoted annotations);
+        #                    the resulting code is still correct, just a less
+        #                    safe rewrite.  Acceptable here.
+        # --exit-zero      : always return 0 even when fixes were applied,
+        #                    so the workflow can run `git diff` afterwards.
+        run: |
+          ruff check . --fix --unsafe-fixes --exit-zero || true
+
+      - name: Show what changed
+        run: git diff --stat || true
+
+      - name: Commit and push fixes
+        run: |
+          if git diff --quiet; then
+            echo "No lint changes to commit."
+            exit 0
+          fi
+          git config user.name "tux-im-bot"
+          git config user.email "tux-im-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "style: auto-fix ruff lint debt" \
+                     -m "Applied by the lint-fix CI job: ruff check . --fix --unsafe-fixes --exit-zero" \
+                     -m "No code changes were made by hand.  Keeps main ruff-clean without each contributor having to clean up pre-existing unused-import / import-sort debt."
+          # Re-fetch in case another CI run pushed a fix commit in the
+          # meantime (idempotency: rebasing our fix on top of theirs).
+          git pull --rebase --autostash || true
+          git push
 
   # ---------------------------------------------------------------------
   # 2. Build .deb package
