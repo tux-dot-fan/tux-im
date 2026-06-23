@@ -1,3 +1,17 @@
+tux-im (0.1.0-12) resolute; urgency=medium
+
+  * ci: drop the lint-fix auto-push job.  Main is now ruff-clean
+    (all debt cleared by the 0.1.0-11 bot round), so the bot was
+    just producing empty commits on every push.  The job can be
+    reintroduced later if new lint debt accumulates (a one-shot
+    `ruff check . --fix` on the developer's machine is usually
+    faster than waiting for CI round-trip).
+  * ci: clarify the workflow comment block — every push to main
+    and every PR now runs lint+test+build-deb (so we always know
+    the .deb still builds), but only a v* tag triggers the
+    `release` job that attaches the .deb to a GitHub Release.
+    No change to actual trigger conditions, just the inline docs.
+
 tux-im (0.1.0-11) resolute; urgency=medium
 
   * ci: drop python3-sounddevice from Build-Depends (noble repo

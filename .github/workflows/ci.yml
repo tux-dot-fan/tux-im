@@ -1,5 +1,11 @@
 name: CI
 
+# Trigger on every push to main, every PR, every v* tag, and manual dispatch.
+# Job-level `if:` conditions narrow down which jobs actually run for each
+# trigger so we don't waste CI minutes on jobs that have nothing to do.
+#
+# Push-to-main / PR  → run lint+test+build-deb (gate, deb is verified but not released)
+# Push-v*-tag        → above + create/update GitHub Release with the .deb attached
 on:
   push:
     branches: [main]
@@ -9,7 +15,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: write   # release job needs this to attach .deb to GitHub Releases
 
 jobs:
   # ---------------------------------------------------------------------
@@ -76,73 +82,11 @@ jobs:
             -v
 
   # ---------------------------------------------------------------------
-  # 1b. Auto-fix lint debt (separate job so the test job's pass/fail is
-  #     independent of whether the project is currently ruff-clean).
-  #     On push to main only: run `ruff check --fix --unsafe-fixes`,
-  #     commit any resulting changes, and push them back.  This keeps
-  #     main ruff-clean without requiring every contributor to fix all
-  #     150+ unused-import / unused-noqa / import-sort issues by hand.
-  # ---------------------------------------------------------------------
-  lint-fix:
-    name: Auto-fix lint debt
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    # Serialise fix jobs so two simultaneous pushes don't race on
-    # `git push` to main.  The cancel-in-progress pattern is fine
-    # because the commit is idempotent.
-    concurrency:
-      group: lint-fix-main
-      cancel-in-progress: true
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install ruff
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install "ruff>=0.1"
-
-      - name: Auto-fix lint debt
-        # --fix            : apply safe fixes (unused imports, import sort,
-        #                    unused noqa, etc.)
-        # --unsafe-fixes   : also apply the small set of unsafe fixes ruff
-        #                    refuses by default (e.g. UP037 quoted annotations);
-        #                    the resulting code is still correct, just a less
-        #                    safe rewrite.  Acceptable here.
-        # --exit-zero      : always return 0 even when fixes were applied,
-        #                    so the workflow can run `git diff` afterwards.
-        run: |
-          ruff check . --fix --unsafe-fixes --exit-zero || true
-
-      - name: Show what changed
-        run: git diff --stat || true
-
-      - name: Commit and push fixes
-        run: |
-          if git diff --quiet; then
-            echo "No lint changes to commit."
-            exit 0
-          fi
-          git config user.name "tux-im-bot"
-          git config user.email "tux-im-bot@users.noreply.github.com"
-          git add -A
-          git commit -m "style: auto-fix ruff lint debt" \
-                     -m "Applied by the lint-fix CI job: ruff check . --fix --unsafe-fixes --exit-zero" \
-                     -m "No code changes were made by hand.  Keeps main ruff-clean without each contributor having to clean up pre-existing unused-import / import-sort debt."
-          # Re-fetch in case another CI run pushed a fix commit in the
-          # meantime (idempotency: rebasing our fix on top of theirs).
-          git pull --rebase --autostash || true
-          git push
-
-  # ---------------------------------------------------------------------
-  # 2. Build .deb package
+  # 2. Build .deb package (and upload as artifact)
+  #
+  # Runs on every push to main, every PR, and every v* tag — so we
+  # always know the .deb still builds, even when no release is cut.
+  # The release job downstream only does anything on v* tags.
   # ---------------------------------------------------------------------
   build-deb:
     name: Build Debian package
@@ -209,15 +153,17 @@ jobs:
           retention-days: 14
 
   # ---------------------------------------------------------------------
-  # 3. Attach .deb to a GitHub Release when a v* tag is pushed
+  # 3. Attach .deb to a GitHub Release — ONLY on v* tag push.
+  #
+  # This is the only place we cut a release.  Regular pushes and PRs
+  # build+verify the .deb but don't touch GitHub Releases — keeps
+  # "Releases" as a clean history of intentional, tagged versions.
   # ---------------------------------------------------------------------
   release:
     name: Attach .deb to GitHub Release
     runs-on: ubuntu-latest
     needs: build-deb
     if: startsWith(github.ref, 'refs/tags/v')
-    permissions:
-      contents: write   # required to create/update releases
     steps:
       - name: Download .deb artifact
         uses: actions/download-artifact@v4
