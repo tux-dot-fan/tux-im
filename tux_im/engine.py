@@ -395,8 +395,14 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         if not self._initialized:
             return
         if not self._chinese_mode:
+            # English mode: hide every IBus surface so the user sees
+            # nothing — input goes straight through to the app.  All
+            # three (preedit, auxiliary, lookup table) must be hidden
+            # because Chinese mode may have left a lookup table
+            # visible from a previous state.
             self.hide_preedit_text()
             self.hide_auxiliary_text()
+            self.hide_lookup_table()
             return
 
         buf = self._active_mode.buffer

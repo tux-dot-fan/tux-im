@@ -1,3 +1,13 @@
+tux-im (0.1.0-7) resolute; urgency=medium
+
+  * fix(engine): hide the lookup table when entering English mode.
+    _refresh_preedit() called hide_preedit_text() and
+    hide_auxiliary_text() in the !_chinese_mode branch but missed
+    hide_lookup_table(), so a Chinese candidate panel could remain
+    visible after the user toggled English on.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 11:14:00 +0000
+
 tux-im (0.1.0-6) resolute; urgency=medium
 
   * fix(wbpy): backspace actually deletes characters.  The old
