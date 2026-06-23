@@ -6,13 +6,13 @@ import logging
 import threading
 import time
 from collections.abc import Callable
-from typing import Callable, Optional, cast
+from typing import cast
 
 log = logging.getLogger(__name__)
 
 try:
-    import sounddevice as sd  # type: ignore[misc]
     import numpy as np  # type: ignore[misc]
+    import sounddevice as sd  # type: ignore[misc]
     _HAVE_SD = True
 except ImportError:  # pragma: no cover
     sd = None  # type: ignore[misc]
@@ -33,8 +33,8 @@ class AudioCapture:
         channels: int = 1,
         silence_timeout: float = 2.0,
         max_duration: int = 60,
-        on_silence: Optional[Callable[[], None]] = None,
-        on_level: Optional[Callable[[float], None]] = None,
+        on_silence: Callable[[], None] | None = None,
+        on_level: Callable[[float], None] | None = None,
     ) -> None:
         if not _HAVE_SD:
             raise RuntimeError("sounddevice/numpy not available")
@@ -113,7 +113,7 @@ class AudioCapture:
                 pass
 
     @staticmethod
-    def _to_wav(pcm: "np.ndarray") -> bytes:
+    def _to_wav(pcm: np.ndarray) -> bytes:
         if len(pcm) == 0:
             return b""
         # Use stdlib wave to avoid extra deps.

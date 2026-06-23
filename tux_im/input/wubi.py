@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import gi
 
 gi.require_version("IBus", "1.0")
 from gi.repository import IBus  # noqa: E402
 
-from tux_im.input.base import Candidate, InputMode, KeyResult
-from tux_im.input.lexicon import LexEntry, Trie
+from tux_im.input.base import Candidate, KeyResult
+from tux_im.input.lexicon import Trie
 
 log = logging.getLogger(__name__)
 
@@ -38,7 +37,7 @@ class WubiMode:
         self.cursor = 0
         self._page_offset = 0
 
-    def feed_key(self, keyval: int, state: int) -> Optional[KeyResult]:
+    def feed_key(self, keyval: int, state: int) -> KeyResult | None:
         key = IBus.keyval_name(keyval)
         if key is None:
             return None
@@ -89,7 +88,7 @@ class WubiMode:
         """No sentence-level decoding."""
         return None
 
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         if not self.buffer:
             return None
         entries = self._trie.lookup(self.buffer)

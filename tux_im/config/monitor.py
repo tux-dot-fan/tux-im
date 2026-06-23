@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 import gi
 
 gi.require_version("GLib", "2.0")
-from gi.repository import GLib, Gio  # noqa: E402
+from gi.repository import Gio  # noqa: E402
 
 log = logging.getLogger(__name__)
 

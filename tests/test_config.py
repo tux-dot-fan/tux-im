@@ -18,17 +18,12 @@ Each test below covers one of the field shapes declared in
 
 from __future__ import annotations
 
-import logging
-import sys
-
 # tux_im.config.config uses `from __future__ import annotations`, so this
 # is the same condition the production code runs under.
 from tux_im.config.config import (
-    ASRSection,
     Config,
     DictSection,
     IMESection,
-    UISection,
     _merge,
 )
 

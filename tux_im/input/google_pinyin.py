@@ -18,9 +18,9 @@ from __future__ import annotations
 
 import ctypes
 import os
+from collections.abc import Iterator
 from ctypes import POINTER, c_bool, c_char, c_char_p, c_size_t, c_uint16
 from pathlib import Path
-from typing import Iterator
 
 # ── ctypes type aliases ────────────────────────────────────────────────────────
 
@@ -106,7 +106,7 @@ def _load_lib() -> ctypes.CDLL:
 class Candidate:
     """A decoded Chinese candidate with its pinyin segmentation info."""
 
-    __slots__ = ("text", "pinyin_seg")
+    __slots__ = ("pinyin_seg", "text")
 
     def __init__(self, text: str, pinyin_seg: list[str]):
         self.text = text          # e.g. "你好"
@@ -167,7 +167,7 @@ class GooglePinyinDecoder:
             self._lib.im_close_decoder()
             self._open = False
 
-    def __enter__(self) -> "GooglePinyinDecoder":
+    def __enter__(self) -> GooglePinyinDecoder:
         self.open()
         return self
 
@@ -264,7 +264,7 @@ class GooglePinyinDecoder:
             pinyin_seg.append(sps_str[spl_start[i] : spl_start[i + 1]])
 
         # Get fixed_len to know how many segments are already locked
-        fixed_len = self._lib.im_get_fixed_len()
+        self._lib.im_get_fixed_len()
         # The candidate text is the full decoded Chinese string
         text = self._utf16_to_str(buf)
 
@@ -272,7 +272,7 @@ class GooglePinyinDecoder:
 
     def candidates(self, limit: int = 9) -> Iterator[Candidate]:
         """Iterate over all candidates (up to ``limit``)."""
-        num = self._lib.im_get_sps_str(ctypes.byref(c_size_t()))
+        self._lib.im_get_sps_str(ctypes.byref(c_size_t()))
         # We don't know total count; im_search/im_choose returns it
         # We'll use the most recent count cached by the wrapper
         # For safety, cap at limit

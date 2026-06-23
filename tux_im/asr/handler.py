@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import threading
-from enum import Enum
-from typing import Callable
+from collections.abc import Callable
+from enum import StrEnum
 
 import gi
 
@@ -16,12 +16,12 @@ from gi.repository import GLib  # noqa: E402
 from tux_im.asr.capture import AudioCapture
 from tux_im.asr.client import ASRClient, ASRError
 from tux_im.asr.overlay import OverlayState, OverlayWindow
-from tux_im.config.config import ASRSection, Config
+from tux_im.config.config import Config
 
 log = logging.getLogger(__name__)
 
 
-class ASRState(str, Enum):
+class ASRState(StrEnum):
     IDLE = "idle"
     RECORDING = "recording"
     PROCESSING = "processing"

@@ -18,9 +18,10 @@ from __future__ import annotations
 import atexit
 import logging
 import os
+from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, IO, Iterable, Iterator
+from typing import IO, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from tux_im.config.config import Config
@@ -36,7 +37,7 @@ log = logging.getLogger(__name__)
 
 
 # Re-export public names from submodules for backwards compatibility.
-__all__ = ["Lexicon", "Trie", "LexEntry", "load_rime_dict"]
+__all__ = ["LexEntry", "Lexicon", "Trie", "load_rime_dict"]
 
 
 @dataclass
@@ -62,7 +63,7 @@ class Lexicon:
     _flush_timer: Callable[[], bool] | None = field(default=None, repr=False)
 
     @classmethod
-    def load(cls, config: Config) -> "Lexicon":  # noqa: ANN001
+    def load(cls, config: Config) -> Lexicon:
         lex = cls()
         # Load system dictionaries first.
         for path, scheme in _discover_dicts(config.dictionary.search_paths):
@@ -142,7 +143,7 @@ class Lexicon:
                     pass
 
     @staticmethod
-    def _write_user_words(fh: IO[str], trie: "Trie") -> None:
+    def _write_user_words(fh: IO[str], trie: Trie) -> None:
         """Write every entry in ``trie`` as a TSV line."""
         written: set[tuple[str, str]] = set()
         for entry in trie.iter_words():

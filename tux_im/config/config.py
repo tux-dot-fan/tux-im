@@ -116,7 +116,7 @@ class Config:
     dictionary: DictSection = field(default_factory=DictSection)
 
     @classmethod
-    def load(cls, path: Path | None = None) -> "Config":
+    def load(cls, path: Path | None = None) -> Config:
         path = path or CONFIG_PATH
         cfg = cls(path=path)
         if not path.exists():

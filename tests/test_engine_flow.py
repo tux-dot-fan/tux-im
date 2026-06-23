@@ -14,17 +14,14 @@ delegate to _handle_key, so testing _handle_key is equivalent.
 
 from __future__ import annotations
 
-import pytest
-
-from tux_im.input.base import Candidate
-from tux_im.input.lexicon import Lexicon, Trie
+from tux_im.input.lexicon import Trie
 from tux_im.input.pinyin import PinyinMode
 from tux_im.input.wubi import WubiMode
 
 
 def _kv(c: str) -> int:
     """Convert a character to a Gdk keyval (Gdk 3.0)."""
-    from gi.repository import Gdk  # noqa: N813
+    from gi.repository import Gdk
     return Gdk.unicode_to_keyval(ord(c))
 
 

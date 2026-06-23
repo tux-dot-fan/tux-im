@@ -7,9 +7,9 @@ import pytest
 # respx is required for mocking HTTP calls; skip the whole module if it's not installed
 pytest.importorskip("respx")
 
-import httpx  # noqa: E402
+import httpx
 
-from tux_im.asr.client import ASRClient, ASRError  # noqa: E402
+from tux_im.asr.client import ASRClient, ASRError
 
 
 @pytest.mark.asyncio

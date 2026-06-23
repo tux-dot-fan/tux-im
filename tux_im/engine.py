@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
+from typing import TYPE_CHECKING
 
 import gi
 
 gi.require_version("IBus", "1.0")
 from gi.repository import IBus  # noqa: E402
 
-from tux_im.input.base import Candidate, InputMode, KeyResult
+from tux_im.input.base import Candidate, InputMode
 from tux_im.input.emoji import EmojiMode
+from tux_im.input.google_pinyin_mode import GooglePinyinMode
 from tux_im.input.latin import LatinMode
 from tux_im.input.pinyin import PinyinMode
-from tux_im.input.google_pinyin_mode import GooglePinyinMode
 from tux_im.input.wbpy import WbpyMode
 from tux_im.input.wubi import WubiMode
 
@@ -25,9 +26,9 @@ if TYPE_CHECKING:
 
 log = logging.getLogger(__name__)
 
-_config: "Config | None" = None
-_lexicon: "Lexicon | None" = None
-_shortcuts: "ShortcutManager | None" = None
+_config: Config | None = None
+_lexicon: Lexicon | None = None
+_shortcuts: ShortcutManager | None = None
 
 ENGINES_BY_MODE: dict[str, type] = {
     "pinyin": PinyinMode,

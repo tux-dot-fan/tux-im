@@ -6,8 +6,8 @@ unit-testable in complete isolation from the rest of the IME.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass, field
-from typing import Iterator
 
 
 @dataclass
@@ -21,7 +21,7 @@ class LexEntry:
 
 @dataclass
 class _TrieNode:
-    children: dict[str, "_TrieNode"] = field(default_factory=dict)
+    children: dict[str, _TrieNode] = field(default_factory=dict)
     entries: list[LexEntry] = field(default_factory=list)
     is_word: bool = False
 

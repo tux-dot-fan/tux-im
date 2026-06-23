@@ -8,14 +8,11 @@ suspend Chinese input.
 
 from __future__ import annotations
 
-from typing import Optional
-
 import gi
 
 gi.require_version("IBus", "1.0")
-from gi.repository import IBus  # noqa: E402
 
-from tux_im.input.base import Candidate, InputMode, KeyResult
+from tux_im.input.base import Candidate, KeyResult
 
 
 class LatinMode:
@@ -34,7 +31,7 @@ class LatinMode:
     def __init__(self, config: object) -> None:
         pass
 
-    def feed_key(self, keyval: int, state: int) -> Optional[KeyResult]:
+    def feed_key(self, keyval: int, state: int) -> KeyResult | None:
         # Engine._handle_key returns False immediately when _chinese_mode is
         # False (line: "if not self._chinese_mode: return False"), so Latin
         # mode never actually receives a key event in normal operation.
@@ -44,7 +41,7 @@ class LatinMode:
     def reset(self) -> None:
         pass
 
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         return None
 
     def candidates(self, limit: int = 9) -> list[Candidate]:

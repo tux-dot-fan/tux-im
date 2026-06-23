@@ -9,11 +9,8 @@ included in the keyword buffer.
 
 from __future__ import annotations
 
-from typing import Optional
-
-from tux_im.input.base import Candidate, InputMode, KeyResult
+from tux_im.input.base import Candidate, KeyResult
 from tux_im.input.lexicon import Trie
-
 
 # ---- Built-in emoji dictionary ----
 
@@ -297,7 +294,7 @@ class EmojiMode:
     buffer = ""
     cursor = 0
 
-    def __init__(self, config: object) -> None:  # noqa: ARG002
+    def __init__(self, config: object) -> None:
         # Store keyword as code and emoji as word.
         # _trie: code=keyword → word=emoji
         # _emoji_to_keyword: emoji → keyword (reverse lookup)
@@ -309,7 +306,7 @@ class EmojiMode:
             self._trie.insert(keyword, emoji, freq=0)
             self._emoji_to_keyword[emoji] = keyword
 
-    def feed_key(self, keyval: int, state: int) -> Optional[KeyResult]:  # noqa: ARG002
+    def feed_key(self, keyval: int, state: int) -> KeyResult | None:
         """Handle a key press.
 
         The colon ':' (keyval 0x3A) enters emoji mode.
@@ -347,7 +344,7 @@ class EmojiMode:
         self._page_offset = 0
         self._emoji_active = False
 
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         """No implicit commit in emoji mode."""
         return None
 

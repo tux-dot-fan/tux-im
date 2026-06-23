@@ -4,23 +4,20 @@ from __future__ import annotations
 
 import logging
 import math
-from enum import Enum
-from typing import Optional
-
-import cairo
+from enum import StrEnum
 
 import gi
 
 gi.require_version("Gdk", "3.0")
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gdk, GLib, Gtk  # noqa: E402
+from gi.repository import Gdk, Gtk  # noqa: E402
 
 log = logging.getLogger(__name__)
 
 _PI_2 = math.pi / 2
 
 
-class OverlayState(str, Enum):
+class OverlayState(StrEnum):
     IDLE = "idle"
     RECORDING = "recording"
     PROCESSING = "processing"

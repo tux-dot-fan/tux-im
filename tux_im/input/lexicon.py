@@ -14,4 +14,4 @@ from tux_im.input.lexicon import (
     load_rime_dict,
 )
 
-__all__ = ["Lexicon", "Trie", "LexEntry", "load_rime_dict"]
+__all__ = ["LexEntry", "Lexicon", "Trie", "load_rime_dict"]

@@ -44,9 +44,9 @@ import ctypes
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING
 
-from tux_im.input.base import Candidate, InputMode, KeyResult
+from tux_im.input.base import Candidate, KeyResult
 
 if TYPE_CHECKING:
     pass

@@ -15,7 +15,6 @@ Algorithm:
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 import gi
 
@@ -23,8 +22,7 @@ gi.require_version("IBus", "1.0")
 from gi.repository import IBus  # noqa: E402
 
 from tux_im.input.base import Candidate, InputMode, KeyResult
-from tux_im.input.lexicon import LexEntry, Trie
-from tux_im.input.pinyin import PinyinMode
+from tux_im.input.lexicon import Trie
 from tux_im.input.wubi import WubiMode
 
 log = logging.getLogger(__name__)
@@ -92,7 +90,7 @@ class WbpyMode:
         if self._wubi_mode:
             self._wubi_mode.reset()
 
-    def feed_key(self, keyval: int, state: int) -> Optional[KeyResult]:
+    def feed_key(self, keyval: int, state: int) -> KeyResult | None:
         key = IBus.keyval_name(keyval)
         if key is None:
             return None
@@ -232,7 +230,7 @@ class WbpyMode:
             self._wubi_mode.buffer = buf[last_tone_idx + 1:]
         return True
 
-    def full_sentence(self) -> Optional[str]:
+    def full_sentence(self) -> str | None:
         """Return the text that will be committed on space: the top entry
         from the merged (deduplicated) candidate list, i.e. the first
         wubi candidate if any, otherwise the first pinyin candidate,
@@ -245,7 +243,7 @@ class WbpyMode:
             return all_cands[0].text
         return self.buffer
 
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         if not self.buffer:
             return None
         cands = self.candidates(limit=1)

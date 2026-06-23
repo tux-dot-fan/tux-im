@@ -29,8 +29,8 @@ test_candidates_and_select_index_consistency().
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Optional, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Protocol, runtime_checkable
 
 
 @dataclass
@@ -62,7 +62,7 @@ class KeyResult:
     """
 
     handled: bool = False
-    commit: Optional[str] = None
+    commit: str | None = None
     clear: bool = False
 
 
@@ -176,7 +176,7 @@ class InputMode(Protocol):
     buffer: str
     cursor: int
 
-    def feed_key(self, keyval: int, state: int) -> Optional[KeyResult]:
+    def feed_key(self, keyval: int, state: int) -> KeyResult | None:
         """Handle a key press.  See class docstring for details."""
         ...
 
@@ -184,7 +184,7 @@ class InputMode(Protocol):
         """Clear the input buffer.  See class docstring for details."""
         ...
 
-    def commit(self) -> Optional[str]:
+    def commit(self) -> str | None:
         """Commit top candidate without clearing.  See class docstring for details."""
         ...
 
@@ -200,7 +200,7 @@ class InputMode(Protocol):
         """Navigate candidate pages.  See class docstring for details."""
         ...
 
-    def full_sentence(self) -> Optional[str]:
+    def full_sentence(self) -> str | None:
         """Return full decoded sentence.  See class docstring for details."""
         ...
 

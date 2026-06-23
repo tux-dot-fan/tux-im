@@ -6,7 +6,6 @@ import logging
 import os
 import signal
 import sys
-from pathlib import Path
 
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
 
@@ -32,7 +31,7 @@ def main() -> int:
 
         gi.require_version("GObject", "2.0")
         gi.require_version("IBus", "1.0")
-        from gi.repository import GLib, Gio, GObject, IBus  # noqa: F401
+        from gi.repository import Gio, GLib, GObject, IBus
     except (ImportError, ValueError) as exc:
         log.error("IBus/GObject introspection not available: %s", exc)
         log.error("Install: sudo apt install python3-gi python3-ibus-1.0")
@@ -163,7 +162,7 @@ def main() -> int:
     # on older platforms.
     try:
         gi.require_version("GLibUnix", "2.0")
-        from gi.repository import GLibUnix  # noqa: F811
+        from gi.repository import GLibUnix
         GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _request_quit)
         GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _request_quit)
     except (ImportError, ValueError):

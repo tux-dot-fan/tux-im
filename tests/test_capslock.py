@@ -19,13 +19,12 @@ from __future__ import annotations
 import gi
 
 gi.require_version("IBus", "1.0")
-from gi.repository import IBus  # noqa: E402
-
 import pytest
+from gi.repository import IBus  # noqa: E402
 
 
 def _kv(c: str) -> int:
-    from gi.repository import Gdk  # noqa: N813
+    from gi.repository import Gdk
     return Gdk.unicode_to_keyval(ord(c))
 
 
@@ -38,7 +37,6 @@ def engine() -> object:
     methods we do not want to exercise.  Only ``_handle_key`` is exercised.
     """
     import tux_im.engine as engine_mod
-    from tux_im.config.config import Config
 
     eng = engine_mod.TuxEngine.__new__(engine_mod.TuxEngine)
 
