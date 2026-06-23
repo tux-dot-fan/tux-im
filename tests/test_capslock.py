@@ -20,7 +20,7 @@ import gi
 
 gi.require_version("IBus", "1.0")
 import pytest
-from gi.repository import IBus  # noqa: E402
+from gi.repository import IBus
 
 
 def _kv(c: str) -> int:

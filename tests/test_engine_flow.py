@@ -41,7 +41,7 @@ class _FakeConfig:
     # mirror the original Config dataclass dot-path.  Re-expose the
     # CapWords classes under those lowercase names.
     ime = Ime
-    dict = Dict  # noqa: A001
+    dict = Dict
 
 
 # ---------------------------------------------------------------------------

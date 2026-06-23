@@ -5,7 +5,7 @@ from __future__ import annotations
 import gi
 
 gi.require_version("IBus", "1.0")
-from gi.repository import IBus  # noqa: E402
+from gi.repository import IBus
 
 from tux_im.input.pinyin import PinyinMode
 

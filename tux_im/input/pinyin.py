@@ -7,7 +7,7 @@ import logging
 import gi
 
 gi.require_version("IBus", "1.0")
-from gi.repository import IBus  # noqa: E402
+from gi.repository import IBus
 
 from tux_im.input.base import Candidate, KeyResult
 from tux_im.input.lexicon import LexEntry, Trie

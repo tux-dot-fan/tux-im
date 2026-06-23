@@ -11,7 +11,7 @@ from enum import StrEnum
 import gi
 
 gi.require_version("GLib", "2.0")
-from gi.repository import GLib  # noqa: E402
+from gi.repository import GLib
 
 from tux_im.asr.capture import AudioCapture
 from tux_im.asr.client import ASRClient, ASRError

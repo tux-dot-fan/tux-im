@@ -9,7 +9,7 @@ from pathlib import Path
 import gi
 
 gi.require_version("GLib", "2.0")
-from gi.repository import Gio  # noqa: E402
+from gi.repository import Gio
 
 log = logging.getLogger(__name__)
 
