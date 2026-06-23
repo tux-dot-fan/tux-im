@@ -131,14 +131,48 @@ def main() -> int:
         log.warning("Failed to acquire bus name (result=%s). The engine may not be reachable.", result)
 
     # Quitting the main loop via signal.
-    def _on_signal(_sig: int, _frame: object | None) -> None:
-        log.info("Signal %s received, quitting", _sig)
+    #
+    # IMPORTANT: IBus.main() runs a GLib MainLoop which intercepts UNIX
+    # signals itself — Python-level signal.signal() handlers are NOT
+    # invoked while the GLib loop is running, AND calling IBus.quit()
+    # from a signal handler is unsafe because GLib APIs are not
+    # async-signal-safe.
+    #
+    # The supported pattern is GLib.unix_signal_add() (or the newer
+    # GLibUnix.signal_add()) which registers a callback that runs
+    # INSIDE the main loop when the signal arrives.  We still install
+    # Python-level signal.signal() as a fallback in case the engine
+    # is started outside an IBus main loop (e.g. during a brief
+    # startup window before IBus.main() is entered).
+    def _request_quit() -> None:
+        log.info("Quit requested, leaving IBus.main()")
         IBus.quit()
+
+    def _on_signal(_sig: int, _frame: object | None) -> None:
+        # Fallback for pre-main-loop windows.  Inside the main loop
+        # this handler is NOT called — GLib intercepts the signal and
+        # invokes the GLibUnix callback below instead.
+        _request_quit()
 
     signal.signal(signal.SIGTERM, _on_signal)
     signal.signal(signal.SIGINT, _on_signal)
+    # Inside the main loop, GLib intercepts SIGINT/SIGTERM and
+    # dispatches the registered callback.  GLibUnix.signal_add is the
+    # current (non-deprecated) name; the deprecation message points
+    # users there.  We try it first, fall back to GLib.unix_signal_add
+    # on older platforms.
+    try:
+        gi.require_version("GLibUnix", "2.0")
+        from gi.repository import GLibUnix  # noqa: F811
+        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _request_quit)
+        GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _request_quit)
+    except (ImportError, ValueError):
+        # Older GLib — use the deprecated but still-functional API.
+        log.debug("GLibUnix not available, falling back to GLib.unix_signal_add")
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, _request_quit)
+        GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, _request_quit)
 
-    log.info("TUX IM engine running")
+    log.info("TUX IM engine running (Ctrl+C to quit)")
     IBus.main()
     log.info("TUX IM engine stopped")
     return 0

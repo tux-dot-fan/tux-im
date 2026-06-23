@@ -1,3 +1,17 @@
+tux-im (0.1.0-5) resolute; urgency=medium
+
+  * fix(main): Ctrl+C now actually quits the engine.  The old code
+    registered Python signal.signal(SIGINT) handlers that called
+    IBus.quit() — but IBus.main() runs a GLib MainLoop which
+    intercepts UNIX signals itself, so the Python handlers were
+    never invoked and the engine hung on Ctrl+C.  Now uses
+    GLibUnix.signal_add (with a fallback to the deprecated
+    GLib.unix_signal_add) which registers a callback that runs
+    INSIDE the main loop when the signal arrives.  signal.signal()
+    is kept as a fallback for the pre-loop startup window.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 10:59:00 +0000
+
 tux-im (0.1.0-4) resolute; urgency=medium
 
   * fix(wbpy): actually feed keys to BOTH wubi and google pinyin
