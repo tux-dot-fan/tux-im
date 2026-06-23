@@ -1,3 +1,12 @@
+tux-im (0.1.0-2) resolute; urgency=medium
+
+  * fix(config): _merge must read field TYPES, not values.  Use
+    __dataclass_fields__[k].type instead of asdict() so the runtime
+    type check in Config._apply does not crash on startup with
+    "TypeError: isinstance() arg 2 must be a type, ...".
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 10:36:00 +0000
+
 tux-im (0.1.0-1) resolute; urgency=medium
 
   * Initial release.
