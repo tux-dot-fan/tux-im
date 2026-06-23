@@ -178,8 +178,12 @@ jobs:
         run: |
           dpkg-buildpackage -us -uc -b
           # dpkg-buildpackage writes the .deb one level up from the
-          # source tree (so it ends up in $GITHUB_WORKSPACE root).
-          ls -la ../*.deb
+          # source tree, i.e. into $GITHUB_WORKSPACE root.  Move it
+          # into ./dist/ so the upload-artifact action can pick it up
+          # (v4 of that action forbids `..` relative paths).
+          mkdir -p dist
+          mv ../*.deb dist/
+          ls -la dist/
 
       - name: Verify .deb metadata (sanity check)
         # We deliberately do NOT install the package: the runner does not
@@ -188,7 +192,7 @@ jobs:
         # validate the .deb file itself.  `dpkg-deb` is sufficient to
         # verify the package was built correctly.
         run: |
-          DEB=$(ls ../*.deb | head -n1)
+          DEB=$(ls dist/*.deb | head -n1)
           echo "Inspecting $DEB"
           dpkg-deb -I "$DEB"
           echo "--- File list ---"
@@ -200,7 +204,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tux-im-${{ github.ref_name }}-${{ github.sha }}
-          path: ../*.deb
+          path: dist/*.deb
           if-no-files-found: error
           retention-days: 14
 
