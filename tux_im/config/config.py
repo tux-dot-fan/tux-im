@@ -198,38 +198,78 @@ def _merge(dataclass_obj: Any, data: dict[str, Any]) -> Any:
     so a typo like ``max_candidates = "9"`` (string instead of int) does
     not corrupt the dataclass.
     """
-    from dataclasses import asdict, replace
-    from typing import get_origin, get_args
+    from dataclasses import replace
+    from typing import get_args, get_origin, get_type_hints
 
     if not isinstance(data, dict):
         return dataclass_obj
-    valid = {}
-    # Use the dataclass type's __dataclass_fields__ to introspect declared
-    # field types.  We must NOT use asdict() here — asdict returns the
-    # *values* of each field, not its declared type, and the isinstance
-    # check below needs the type.  This bug crashed config loading on
-    # startup with: TypeError: isinstance() arg 2 must be a type, ...
-    fields = dataclass_obj.__dataclass_fields__
+    # Resolve annotations to real types.  This module uses
+    # `from __future__ import annotations` (PEP 563), so plain
+    # `__dataclass_fields__[k].type` is a *string* like "list[str]".
+    # get_type_hints() evaluates those strings back into real types.
+    try:
+        resolved = get_type_hints(type(dataclass_obj))
+    except Exception:  # pragma: no cover - defensive
+        resolved = {}
+    valid: dict[str, Any] = {}
     for k, v in data.items():
-        if k not in fields:
-            log.debug("_merge: unknown field %r, ignoring", k)
+        expected_type = resolved.get(k)
+        if expected_type is None:
+            # Field unknown to get_type_hints (e.g. not in resolved) but
+            # still present on the dataclass — accept it without a type
+            # check rather than drop on the floor.  This is the
+            # backwards-compat path for forward references that
+            # get_type_hints could not resolve.
+            if not hasattr(dataclass_obj, k):
+                log.debug("_merge: unknown field %r, ignoring", k)
+                continue
+            valid[k] = v
             continue
-        expected_type = fields[k].type
-        # Unwrap Optional[T] (get_origin == Union, get_args gives (T, NoneType)).
         origin = get_origin(expected_type)
-        if origin is type(None):
-            # bare Optional without args
-            continue
         if origin is not None:
-            # For Optional[T] or Union[T, ...], accept None and T.
+            # Optional[T] / Union[T, ...] / list[T] / dict[K, V] etc.
+            # Strategy: isinstance supports a tuple of types, but it does
+            # NOT understand ``list[str]`` — it only checks the *outer*
+            # type.  So we must build a check for the origin type itself
+            # and validate the inner args recursively.
             args = get_args(expected_type)
-            if v is not None and not isinstance(v, args):
+            if v is None:
+                # None is only valid if NoneType is in args (Optional).
+                if type(None) in args:
+                    valid[k] = v
+                    continue
+                log.warning("_merge: field %r expected %r, got None -- ignoring",
+                            k, expected_type)
+                continue
+            if not isinstance(v, origin):
                 log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
                             k, expected_type, v, type(v).__name__)
                 continue
-        elif not isinstance(v, expected_type):
-            log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
-                        k, expected_type, v, type(v).__name__)
+            # For containers, do a shallow inner-type check too.
+            if origin in (list, tuple, set, frozenset):
+                if args:
+                    inner = args[0]
+                    if not all(isinstance(x, inner) for x in v):
+                        log.warning(
+                            "_merge: field %r expected elements of type %r -- ignoring",
+                            k, inner,
+                        )
+                        continue
+            elif origin is dict and len(args) == 2:
+                k_t, v_t = args
+                if not all(isinstance(x, k_t) and isinstance(y, v_t)
+                           for x, y in v.items()):
+                    log.warning(
+                        "_merge: field %r expected dict[%r, %r] -- ignoring",
+                        k, k_t, v_t,
+                    )
+                    continue
+            valid[k] = v
             continue
-        valid[k] = v
+        # Plain type (str, int, bool, float, ...).
+        if isinstance(v, expected_type):
+            valid[k] = v
+            continue
+        log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
+                    k, expected_type, v, type(v).__name__)
     return replace(dataclass_obj, **valid)

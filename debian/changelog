@@ -1,3 +1,16 @@
+tux-im (0.1.0-3) resolute; urgency=medium
+
+  * fix(config): _merge must handle PEP 563 forward-ref annotations and
+    generic container inner types.  After 0.1.0-2 the engine still
+    crashed on startup because `from __future__ import annotations`
+    turns every annotation into a string, so `fields[k].type` was the
+    string "str" / "list[str]" and isinstance() rejected it.  Now uses
+    typing.get_type_hints() to resolve annotations to real types, and
+    checks container inner types (list[T].__args__[0]) explicitly.
+    Adds tests/test_config.py with regression coverage.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 10:42:00 +0000
+
 tux-im (0.1.0-2) resolute; urgency=medium
 
   * fix(config): _merge must read field TYPES, not values.  Use
