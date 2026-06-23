@@ -77,6 +77,10 @@ class WubiMode:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
 
+    def full_sentence(self) -> None:
+        """No sentence-level decoding."""
+        return None
+
     def commit(self) -> Optional[str]:
         if not self.buffer:
             return None

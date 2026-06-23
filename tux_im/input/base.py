@@ -153,6 +153,12 @@ class InputMode(Protocol):
         used by candidates() to slice the result list.
         Returns KeyResult(handled=True) always (page navigation is internal).
 
+    full_sentence() -> Optional[str]
+        Returns the full decoded sentence (all words, no segmentation).
+        Only relevant for sentence-level decoders (e.g. Google Pinyin).
+        Other modes return None.  The engine displays this in auxiliary text
+        so it does not duplicate the first entry of the candidate list.
+
     Required instance attributes
     ----------------------------
     name : str
@@ -192,4 +198,8 @@ class InputMode(Protocol):
 
     def page(self, direction: int) -> KeyResult:
         """Navigate candidate pages.  See class docstring for details."""
+        ...
+
+    def full_sentence(self) -> Optional[str]:
+        """Return full decoded sentence.  See class docstring for details."""
         ...

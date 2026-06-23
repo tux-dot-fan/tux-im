@@ -222,6 +222,10 @@ class PinyinMode:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
 
+    def full_sentence(self) -> str | None:
+        """No sentence-level decoding; return None."""
+        return None
+
 
 def _entry_to_candidate(e: LexEntry) -> Candidate:
     return Candidate(text=e.word, display=e.word, comment=e.code, freq=e.freq)

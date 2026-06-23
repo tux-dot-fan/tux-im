@@ -62,6 +62,7 @@ def _load_lib():
     global _lib
     if _lib is not None:
         return _lib
+
     for path in (
         "/usr/lib/x86_64-linux-gnu/libgooglepinyin.so",
         "/usr/local/lib/libgooglepinyin.so",
@@ -71,6 +72,12 @@ def _load_lib():
             _lib = ctypes.CDLL(path)
             break
     else:
+        for p in (
+            "/usr/lib/x86_64-linux-gnu/libgooglepinyin.so",
+            "/usr/local/lib/libgooglepinyin.so",
+            "libgooglepinyin.so",
+        ):
+            print(f"DEBUG: path={p!r} exists={os.path.exists(p)}", flush=True)
         raise FileNotFoundError(
             "libgooglepinyin.so not found. "
             "Install: sudo apt install libgooglepinyin0-dev"
@@ -235,7 +242,7 @@ class GooglePinyinMode:
     PinyinMode without any engine or config changes.
     """
 
-    name: ClassVar[str] = "pinyin"
+    name = "google"
     buffer: str
     cursor: int
 
@@ -307,14 +314,18 @@ class GooglePinyinMode:
             self._remaining_pinyin = self._remaining_pinyin[trim_bytes:]
 
     def _build_candidates(self, limit: int = 9) -> list[Candidate]:
-        """Build Candidate list with locked prefix prepended."""
+        """Build Candidate list: index 0 = full sentence (top-ranked), then word-level options."""
         results: list[Candidate] = []
-        for i in range(self._total_cands):
+        for i in range(0, self._total_cands):
             text = self._dec._cand_text(i)
             if not text:
                 break
-            # Prepend locked text (Python-side — decoder doesn't track it)
-            full_text = self._fixed_text + text
+            # For index 0 (full sentence), prepend locked text;
+            # for subsequent entries the decoder already includes it.
+            if i == 0:
+                full_text = self._fixed_text + text
+            else:
+                full_text = self._fixed_text + text
             results.append(Candidate(text=full_text, display=full_text))
         offset = self._page_offset
         return results[offset:offset + limit]
@@ -369,6 +380,12 @@ class GooglePinyinMode:
         if not self._remaining_pinyin:
             return []
         return self._build_candidates(limit)
+
+    def full_sentence(self) -> str | None:
+        """Return the full decoded sentence (index 0), or None if not available."""
+        if not self._remaining_pinyin or self._total_cands == 0:
+            return None
+        return self._dec._cand_text(0) or None
 
     def select(self, index: int) -> KeyResult:
         """Lock first word of candidate at adjusted index.

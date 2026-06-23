@@ -14,6 +14,7 @@ from tux_im.input.base import Candidate, InputMode, KeyResult
 from tux_im.input.emoji import EmojiMode
 from tux_im.input.latin import LatinMode
 from tux_im.input.pinyin import PinyinMode
+from tux_im.input.google_pinyin_mode import GooglePinyinMode
 from tux_im.input.wbpy import WbpyMode
 from tux_im.input.wubi import WubiMode
 
@@ -31,8 +32,8 @@ _shortcuts: "ShortcutManager | None" = None
 ENGINES_BY_MODE: dict[str, type] = {
     "pinyin": PinyinMode,
     "wubi": WubiMode,
-    "wbpy": WbpyMode,
-    "emoji": EmojiMode,
+    "wbpy": WbpyMode,  # 86 wubi + google pinyin
+    "google": GooglePinyinMode,
 }
 
 
@@ -69,6 +70,10 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             return
         self._initialized = True
         self._active_mode = self._make_mode(_config.ime.default_mode)
+        # Ensure auxiliary text area is visible — without this call the area
+        # stays hidden and update_auxiliary_text() has no visible effect.
+        self.show_auxiliary_text()
+        self.show_preedit_text()
 
     # ---- Mode management ----
 
@@ -82,13 +87,15 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             mode = WbpyMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
             mode.attach_wubi(_lexicon.wubi)  # type: ignore[union-attr]
             return mode
+        if cls is GooglePinyinMode:
+            return GooglePinyinMode(_lexicon.pinyin, _config)  # type: ignore[union-attr]
         if cls is EmojiMode:
             return EmojiMode(_config)
         return LatinMode(_config)
 
     def set_mode(self, name: str) -> None:
         self._lazy_init()
-        log.info("Switching input mode: %s", name)
+        log.info("Switching input mode: %s -> %s", self._active_mode.name, name)
         self._active_mode = self._make_mode(name)
         self._refresh_preedit()
         self._update_chinese_prop()
@@ -135,14 +142,19 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         buf = self._active_mode.buffer
         result = self._active_mode.commit()
         log.info("commit_first: committed=%r", result)
+        log.debug("commit_first: after mode.commit(), buffer=%r, _remaining_pinyin=%r",
+                  self._active_mode.buffer,
+                  getattr(self._active_mode, '_remaining_pinyin', 'N/A'))
         if result:
             self.commit_text(IBus.Text.new_from_string(result))
             # Learn: space commits the top candidate implicitly.
             # Route through add_user_word so persistence is triggered.
-            if self._config.dictionary.learn_enabled and self._lexicon:
-                self._lexicon.add_user_word(buf, result)
+            if _config and _config.dictionary.learn_enabled and _lexicon:
+                _lexicon.add_user_word(buf, result)
         self._active_mode.reset()
-        self._refresh_preedit()
+        self.hide_preedit_text()
+        self.hide_auxiliary_text()
+        self.hide_lookup_table()
         return True
 
     def select_candidate(self, index: int, *_args: object) -> bool:
@@ -159,8 +171,8 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             self.commit_text(IBus.Text.new_from_string(result.commit))
             # Learn: boost the selected entry so it ranks higher next time.
             # Route through add_user_word so persistence is triggered.
-            if self._config.dictionary.learn_enabled and self._lexicon and buf:
-                self._lexicon.add_user_word(buf, result.commit)
+            if _config and _config.dictionary.learn_enabled and _lexicon and buf:
+                _lexicon.add_user_word(buf, result.commit)
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
@@ -309,6 +321,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
     def do_property_activate(
         self, prop_name: str, prop_state: int
     ) -> None:
+        log.info("do_property_activate: prop=%s state=%d", prop_name, prop_state)
         try:
             self._do_property_activate_impl(prop_name, prop_state)
         except Exception:
@@ -355,15 +368,16 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
     def _handle_key(self, keyval: int, state: int) -> bool:
         self._lazy_init()
 
-        # 1. In Latin mode, let everything pass through.
-        if not self._chinese_mode:
-            return False
-
-        # 2. Shortcuts first — space (commit_first), Escape (cancel), etc.
+        # 1. Shortcuts first — this includes Caps_Lock (toggle_en_cn) which must
+        # work regardless of chinese_mode so it CAN toggle that flag.
         consumed = _shortcuts.handle(self, keyval, state)  # type: ignore[union-attr]
         if consumed:
             self._refresh_preedit()
             return True
+
+        # 2. In Latin mode, let everything else pass through to the app.
+        if not self._chinese_mode:
+            return False
 
         # 3. Hand the key to the active input mode.
         result = self._active_mode.feed_key(keyval, state)
@@ -389,23 +403,25 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
         buf = self._active_mode.buffer
         cands = self._active_mode.candidates(_config.ime.max_candidates)  # type: ignore[union-attr]
+        mode_name = self._active_mode.name
+        log.debug(
+            "_refresh_preedit: mode=%s buf=%r cands=%r",
+            mode_name, buf, [c.text for c in cands],
+        )
 
+        # Auxiliary text: always show what will be committed on space.
+        # For sentence-level modes (google, wbpy with google pinyin), this is
+        # the full decoded sentence.  For other modes it is the top candidate.
+        aux_text = self._active_mode.full_sentence()
         if buf or cands:
-            # Preedit shows the typed buffer; auxiliary text shows a status
-            # badge (mode + buffer + candidate count + top candidate) so the
-            # user always has a place to look, even when no IBus panel runs.
-            mode_name = self._active_mode.name
-            status = f"[{mode_name}] {buf}" if buf else f"[{mode_name}]"
-            if cands:
-                status = f"{status}  \u2192  {cands[0].text}  ({len(cands)})"
             self.update_preedit_text_with_mode(
                 IBus.Text.new_from_string(buf),
                 self._active_mode.cursor,
                 True,
-                IBus.PreeditFocusMode.COMMIT,
+                IBus.PreeditFocusMode.CLEAR,
             )
             self.update_auxiliary_text(
-                IBus.Text.new_from_string(status), False,
+                IBus.Text.new_from_string(aux_text or ""), True,
             )
             if cands:
                 self.update_lookup_table(self._build_lookup(cands), True)
@@ -416,15 +432,27 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             self.hide_auxiliary_text()
             self.hide_lookup_table()
 
+    # Gray color (0xRRGGBB) for comment annotation — muted but readable.
+    _COMMENT_COLOR: int = 0x808080
+
     def _build_lookup(self, cands: list[Candidate]) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
+        log.debug("_build_lookup: input cands=%r", [(c.text, c.display) for c in cands])
         for c in cands:
             display = c.display
-            text = IBus.Text.new_from_string(display)
             if c.comment:
-                # Append comment in gray after the word.
-                comment_str = f"\t{c.comment}"
-                text.append(comment_str)
+                full_text = f"{display}\t{c.comment}"
+                text = IBus.Text.new_from_string(full_text)
+                attr = IBus.attr_foreground_new(
+                    self._COMMENT_COLOR,
+                    len(display),
+                    len(full_text),
+                )
+                attr_list = IBus.AttrList.new()
+                attr_list.append(attr)
+                text.set_attributes(attr_list)
+            else:
+                text = IBus.Text.new_from_string(display)
             table.append_candidate(text)
         return table
 
@@ -491,7 +519,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             mode_name = self._active_mode.name
         except AttributeError:
             return "CN"
-        return {"pinyin": "拼", "wubi": "五", "wbpy": "混", "emoji": "表"}.get(mode_name, "CN")
+        return {"pinyin": "拼", "google": "G", "wubi": "五", "wbpy": "混", "emoji": "表"}.get(mode_name, "CN")
 
     # ---- Commit / reset ----
 

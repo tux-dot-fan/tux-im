@@ -55,3 +55,7 @@ class LatinMode:
 
     def page(self, direction: int) -> KeyResult:
         return KeyResult(handled=False)
+
+    def full_sentence(self) -> None:
+        """No sentence-level decoding."""
+        return None

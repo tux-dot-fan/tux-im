@@ -36,16 +36,26 @@ _WUBI_FIRST_KEY_HINTS = set("ghklmnotvy")
 
 
 class WbpyMode:
-    """Mixed mode. Wraps a `PinyinMode` and a `WubiMode` and merges their
-    candidates, with the buffer interpreted as either scheme depending on
-    the current contents."""
+    """Mixed Wubi + Google Pinyin input mode (86 wubi + google pinyin).
+
+    In wbpy mode the buffer is fed to BOTH engines in parallel:
+      - the wubi engine treats the buffer as a wubi code
+      - the google pinyin engine treats the buffer as a pinyin string
+    The two candidate lists are merged (wubi first, then pinyin,
+    deduplicated by text) and shown in the lookup table.  The auxiliary
+    text area displays what will be committed on space (the top entry of
+    the merged list, or the full google pinyin sentence when one is
+    available).
+    """
 
     name = "wbpy"
     buffer: str
     cursor: int
 
     def __init__(self, pinyin_trie: Trie, config: object) -> None:
-        self._pinyin_mode = PinyinMode(pinyin_trie, config)
+        # The pinyin half is ALWAYS the Google Pinyin full-sentence decoder.
+        from tux_im.input.google_pinyin_mode import GooglePinyinMode
+        self._pinyin_mode: InputMode = GooglePinyinMode(pinyin_trie, config)
         # We share the wubi trie via a closure: the lexicon passes pinyin trie,
         # but the constructor also needs the wubi trie.  Wbpy is created with
         # a single trie arg from the engine; in practice the engine passes the
@@ -134,6 +144,19 @@ class WbpyMode:
     def page(self, direction: int) -> KeyResult:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
+
+    def full_sentence(self) -> Optional[str]:
+        """Return the text that will be committed on space: the top entry
+        from the merged (deduplicated) candidate list, i.e. the first
+        wubi candidate if any, otherwise the first pinyin candidate,
+        falling back to the raw buffer."""
+        if not self.buffer:
+            return None
+        # Grab a large enough window so we don't miss duplicates at the front.
+        all_cands = self.candidates(limit=9999)
+        if all_cands:
+            return all_cands[0].text
+        return self.buffer
 
     def commit(self) -> Optional[str]:
         if not self.buffer:

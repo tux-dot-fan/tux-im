@@ -395,3 +395,7 @@ class EmojiMode:
     def page(self, direction: int) -> KeyResult:
         self._page_offset = max(0, self._page_offset + direction * 9)
         return KeyResult(handled=True)
+
+    def full_sentence(self) -> None:
+        """No sentence-level decoding."""
+        return None
