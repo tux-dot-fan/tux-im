@@ -375,6 +375,27 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
         # 2. In Latin mode, let everything else pass through to the app.
         if not self._chinese_mode:
+            # CapsLock normalisation: when CapsLock is engaged, X11/IBus
+            # reports letter keyvals in upper case ('c' → 'C', keyval 67).
+            # Forcing a pass-through here would commit a capital letter
+            # even though the user did NOT press Shift — most apps and
+            # text fields interpret a bare CapsLock-on 'c' as lower case,
+            # so we follow that convention.  If Shift is held alongside
+            # CapsLock, the desktop typically reports the *lower*-case
+            # keyval (Shift cancels CapsLock), so the path below is
+            # naturally a no-op in that case.  Other keys (digits,
+            # punctuation) are unaffected and pass through unchanged.
+            if state & IBus.ModifierType.LOCK_MASK:
+                keyname = IBus.keyval_name(keyval)
+                if len(keyname) == 1 and keyname.isalpha():
+                    log.debug(
+                        "CapsLock engaged in latin mode: normalising %r -> %r",
+                        keyname, keyname.lower(),
+                    )
+                    self.commit_text(
+                        IBus.Text.new_from_string(keyname.lower())
+                    )
+                    return True
             return False
 
         # 3. Hand the key to the active input mode.

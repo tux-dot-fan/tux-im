@@ -1,3 +1,21 @@
+tux-im (0.1.0-9) resolute; urgency=medium
+
+  * fix(engine): normalise CapsLock-engaged letter keyvals in Latin
+    mode.  When the user pressed CapsLock to enter English mode the
+    physical LED stayed on, so every subsequent letter arrived at
+    IBus as an upper-case keyval ('c' → 'C', 67).  With the engine
+    in latin mode and just returning False, the upper-case keyval
+    was forwarded to the focused app, producing capitalised
+    characters even though no Shift was pressed.  Now the engine
+    detects LOCK_MASK in the key state for alpha keyvals, commits
+    the lower-case equivalent itself, and returns True so the
+    forwarded event is replaced.  Digits, punctuation, and Chinese-
+    mode input are unaffected.  Adds 7 regression tests in
+    tests/test_capslock.py covering single letters, sequences,
+    Shift+Caps, digits, punctuation, and chinese-mode pass-through.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 12:05:00 +0000
+
 tux-im (0.1.0-8) resolute; urgency=medium
 
   * fix(google_pinyin, wbpy): cap pinyin buffer to avoid
