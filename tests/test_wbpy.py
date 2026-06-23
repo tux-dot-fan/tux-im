@@ -187,8 +187,8 @@ def test_wbpy_pinyin_buffer_capped_at_safe_length() -> None:
         src = f.read()
     # The cap constant must be present and ≤ 20 (well below the
     # 19-letter crash threshold, with a safety margin).
-    m = re.search(r"_MAX_PINYIN_LEN\s*=\s*(\d+)", src)
-    assert m is not None, "wbpy _MAX_PINYIN_LEN not found"
+    m = re.search(r"_max_pinyin_len\s*=\s*(\d+)", src)
+    assert m is not None, "wbpy _max_pinyin_len not found"
     cap = int(m.group(1))
     assert cap <= 20, f"wbpy cap too high: {cap}"
     assert cap >= 6, f"wbpy cap too low: {cap}"
@@ -197,8 +197,8 @@ def test_wbpy_pinyin_buffer_capped_at_safe_length() -> None:
     # mode (not wrapped by wbpy) also survives a flood of consonants.
     with open("tux_im/input/google_pinyin_mode.py") as f:
         src = f.read()
-    m = re.search(r"_MAX_DECODE_LEN\s*=\s*(\d+)", src)
-    assert m is not None, "google _MAX_DECODE_LEN not found"
+    m = re.search(r"_max_decode_len\s*=\s*(\d+)", src)
+    assert m is not None, "google _max_decode_len not found"
     cap = int(m.group(1))
     assert cap <= 20, f"google cap too high: {cap}"
     assert cap >= 6, f"google cap too low: {cap}"

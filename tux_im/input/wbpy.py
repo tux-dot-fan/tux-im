@@ -118,10 +118,10 @@ class WbpyMode:
         # internal assert in dict match.  Cap the pinyin engine's
         # buffer at 16 (a reasonable pinyin sentence length: ~6
         # letters per syllable × 2-3 syllables).
-        _MAX_PINYIN_LEN = 16
+        _max_pinyin_len = 16
         if (
             self._pinyin_mode is not None
-            and len(self._pinyin_mode.buffer) >= _MAX_PINYIN_LEN
+            and len(self._pinyin_mode.buffer) >= _max_pinyin_len
             and not is_tone
         ):
             # Reject the letter — don't pass it to the pinyin
