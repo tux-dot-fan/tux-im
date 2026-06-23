@@ -1,3 +1,22 @@
+tux-im (0.1.0-10) resolute; urgency=medium
+
+  * fix(lexicon): parse 4-column Rime dict lines so single-letter
+    wubi codes ("level-1" 简码) load correctly.  Rime's
+    wubi86.dict.yaml uses 4-column lines ``word<TAB>code<TAB>freq
+    <TAB>stem``; the old parser used a greedy ``\S+`` regex that
+    swallowed the entire 4-column line as a single word, then
+    failed to match.  Net effect: every 4-column entry was dropped,
+    including all 25 single-letter wubi codes (a->工, b->了,
+    g->一, r->的, ...) — typing 'g' in wbpy mode produced no
+    candidate at all.  Now try the 4-column pattern first, fall
+    back to the 3-column pattern.  Adds 4 regression tests
+    covering both formats, the single-letter wubi codes, and an
+    end-to-end check against the real /usr/share/rime-data/
+    wubi86.dict.yaml.  Word count goes from ~136,903 to ~136,928
+    in the wubi trie.
+
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 12:30:00 +0000
+
 tux-im (0.1.0-9) resolute; urgency=medium
 
   * fix(engine): normalise CapsLock-engaged letter keyvals in Latin

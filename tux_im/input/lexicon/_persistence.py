@@ -15,11 +15,28 @@ from typing import Iterable, Iterator
 
 log = logging.getLogger(__name__)
 
-_RIME_LINE = re.compile(r"^(\S+)\s+(\S+)(?:\s+(\d+))?\s*$")
+# Rime dict files come in two flavours:
+#   3-column:  word<TAB>code<TAB>freq            (e.g. pinyin tables, user words)
+#   4-column:  word<TAB>code<TAB>freq<TAB>stem   (e.g. wubi86, used for
+#             affix/derivative generation — we ignore the stem column but
+#             must still match the line)
+# We try the 4-column pattern first; if it fails, fall back to the
+# 3-column pattern.  This used to be a single (\S+)-based regex which,
+# due to greedy \S+, swallowed the entire line on 4-column input and
+# silently dropped every entry (notably all 25 single-letter wubi
+# "level-1" codes like "工" -> "a").
+_RIME_LINE_4COL = re.compile(r"^(\S+)\s+(\S+)\s+(\d+)(?:\s+\S+)?\s*$")
+_RIME_LINE_3COL = re.compile(r"^(\S+)\s+(\S+)(?:\s+(\d+))?\s*$")
 
 
 def load_rime_dict(path: Path) -> Iterator[tuple[str, str, int]]:
-    """Parse a RIME-format dict file. Yields (word, code, freq)."""
+    """Parse a RIME-format dict file. Yields (word, code, freq).
+
+    Handles both 3-column (``word<TAB>code<TAB>freq``) and 4-column
+    (``word<TAB>code<TAB>freq<TAB>stem``) lines; the ``stem`` column is
+    ignored (we only use the first three).  Comments (``#`` at start of
+    line) and Rime YAML headers (``---``) are skipped.
+    """
     if not path.exists():
         return
     with path.open(encoding="utf-8") as fh:
@@ -27,10 +44,14 @@ def load_rime_dict(path: Path) -> Iterator[tuple[str, str, int]]:
             line = line.strip()
             if not line or line.startswith("#") or line.startswith("---"):
                 continue
-            m = _RIME_LINE.match(line)
-            if not m:
-                continue
-            word, code, freq = m.group(1), m.group(2), m.group(3) or "0"
+            m = _RIME_LINE_4COL.match(line)
+            if m:
+                word, code, freq = m.group(1), m.group(2), m.group(3)
+            else:
+                m = _RIME_LINE_3COL.match(line)
+                if not m:
+                    continue
+                word, code, freq = m.group(1), m.group(2), m.group(3) or "0"
             yield word, code, int(freq)
 
 

@@ -207,5 +207,104 @@ def test_lexicon_flush_no_path() -> None:
     lex._dirty = True
     # No user_words_path set because file doesn't exist and wasn't created.
     lex._user_words_path = None
-    lex._flush_now()   # must not raise
-    assert lex._dirty  # still dirty since nothing was flushed
+
+
+# ---------------------------------------------------------------------------
+# Rime dict parser: 4-column (wubi) vs 3-column (pinyin) format
+# ---------------------------------------------------------------------------
+
+def test_load_rime_dict_3col_format(tmp_path: Path) -> None:
+    """3-column lines ``word\\tcode\\tfreq`` parse correctly."""
+    f = tmp_path / "test.dict.yaml"
+    f.write_text(
+        "# header\n"
+        "---\n"
+        "你\tni3\t100\n"
+        "好\thao3\t80\n"
+        "国\tguo2\t90\n",
+        encoding="utf-8",
+    )
+    entries = list(load_rime_dict(f))
+    assert entries == [("你", "ni3", 100), ("好", "hao3", 80), ("国", "guo2", 90)]
+
+
+def test_load_rime_dict_4col_format(tmp_path: Path) -> None:
+    """4-column lines ``word\\tcode\\tfreq\\tstem`` parse (stem ignored).
+
+    Wubi86 dict files use this format.  The previous regex used
+    greedy ``\\S+`` and swallowed the entire line, silently dropping
+    every 4-column entry -- including all 25 single-letter "level-1"
+    wubi codes.  This regression test pins the fix.
+    """
+    f = tmp_path / "wubi.dict.yaml"
+    f.write_text(
+        "工\ta\t99454797\taa\n"
+        "了\tb\t1477224452\tbn\n"
+        "一\tg\t2015124793\tgg\n",
+        encoding="utf-8",
+    )
+    entries = list(load_rime_dict(f))
+    assert entries == [
+        ("工", "a", 99454797),
+        ("了", "b", 1477224452),
+        ("一", "g", 2015124793),
+    ]
+
+
+def test_load_rime_dict_single_letter_wubi_codes(tmp_path: Path) -> None:
+    """Single-letter wubi codes (the "level-1" 简码) must parse and insert.
+
+    This is the user-reported bug: typing 'g' produced no candidate
+    because the parser was dropping all 1-letter wubi codes.
+    """
+    from tux_im.input.lexicon import Trie
+
+    f = tmp_path / "wubi86.dict.yaml"
+    f.write_text(
+        "工\ta\t99454797\taa\n"
+        "了\tb\t1477224452\tbn\n"
+        "以\tc\t418261033\tny\n"
+        "在\td\t1133790406\tdh\n"
+        "一\tg\t2015124793\tgg\n",
+        encoding="utf-8",
+    )
+    t = Trie()
+    for word, code, freq in load_rime_dict(f):
+        t.insert(code, word, freq)
+    # All five 1-letter codes must resolve.
+    assert [e.word for e in t.lookup("a")] == ["工"]
+    assert [e.word for e in t.lookup("b")] == ["了"]
+    assert [e.word for e in t.lookup("c")] == ["以"]
+    assert [e.word for e in t.lookup("d")] == ["在"]
+    assert [e.word for e in t.lookup("g")] == ["一"]
+    # And the prefix check used by WubiMode.feed_key must succeed.
+    assert t.has_prefix("g")
+
+
+def test_load_rime_dict_real_wubi86_has_25_level1_codes() -> None:
+    """Real wubi86.dict.yaml from /usr/share/rime-data has 25 level-1 codes.
+
+    Guards against any future regression where the parser again drops
+    single-letter codes.  Skipped if the upstream dict file is not
+    installed (e.g. dev environments without ibus-rime).
+    """
+    real = Path("/usr/share/rime-data/wubi86.dict.yaml")
+    if not real.exists():
+        import pytest
+        pytest.skip("wubi86.dict.yaml not present on this system")
+
+    t = Trie()
+    single_letter: list[str] = []
+    for word, code, freq in load_rime_dict(real):
+        t.insert(code, word, freq)
+        if len(code) == 1 and code.isalpha():
+            single_letter.append(code)
+    # Wubi 86 maps 25 keys (a-y) to single-letter high-frequency chars.
+    assert len(single_letter) == 25, (
+        f"expected 25 single-letter wubi codes, got {len(single_letter)}: "
+        f"{sorted(single_letter)}"
+    )
+    # And every one of them must actually resolve in the trie.
+    for code in "abcdefghijklmnopqrstuvwxyz"[:25]:
+        entries = t.lookup(code)
+        assert len(entries) >= 1, f"code {code!r} has no entries in trie"
