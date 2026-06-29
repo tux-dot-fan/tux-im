@@ -12,7 +12,9 @@ tux-im (0.1.0-12) resolute; urgency=medium
     `release` job that attaches the .deb to a GitHub Release.
     No change to actual trigger conditions, just the inline docs.
 
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 13:00:00 +0000
 tux-im (0.1.0-11) resolute; urgency=medium
+
 
   * ci: drop python3-sounddevice from Build-Depends (noble repo
     does not ship it; runtime-only dependency of the optional ASR
@@ -30,7 +32,9 @@ tux-im (0.1.0-11) resolute; urgency=medium
     /home/dean/... path so the test passes on a CI runner with a
     different $HOME.
 
+ -- TUX IM contributors <tux-im@example.com>  Tue, 23 Jun 2026 12:45:00 +0000
 tux-im (0.1.0-10) resolute; urgency=medium
+
 
   * fix(lexicon): parse 4-column Rime dict lines so single-letter
     wubi codes ("level-1" 简码) load correctly.  Rime's
