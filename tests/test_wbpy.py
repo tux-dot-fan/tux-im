@@ -202,3 +202,152 @@ def test_wbpy_pinyin_buffer_capped_at_safe_length() -> None:
     cap = int(m.group(1))
     assert cap <= 20, f"google cap too high: {cap}"
     assert cap >= 6, f"google cap too low: {cap}"
+
+
+# ---------------------------------------------------------------------------
+# Wbpy punctuation conversion (Chinese-mode punctuation)
+# ---------------------------------------------------------------------------
+
+
+def test_wbpy_punct_empty_buffer_emits_chinese_not_ascii() -> None:
+    """REGRESSION: empty buffer + "." keysym must emit "。" not pass through.
+
+    Before the fix, WbpyMode.feed_key returned None for any non-letter /
+    non-tone key, so the IBus engine forwarded the raw ASCII key to the
+    app.  Punctuation keysyms (period, comma, question, ...) all live in
+    the same branch and were silently swallowed, leaving the user with
+    English punctuation in Chinese-mode text.
+
+    Companion to test_pinyin_punct_empty_buffer_emits_chinese_not_ascii
+    in test_engine_flow.py (PinyinMode).
+    """
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    # Buffer is empty -- the bug-trigger path.
+    kv_period = IBus.keyval_from_name("period")
+    assert kv_period != 0, "IBus has no 'period' keysym"
+    r = mode.feed_key(kv_period, 0)
+    assert r is not None, "feed_key must NOT return None for ASCII punctuation"
+    assert r.handled is True
+    assert r.commit == "。"
+    # Buffer is cleared after commit.
+    assert mode.buffer == ""
+
+
+def test_wbpy_punct_with_buffer_commits_wubi_first_then_chinese() -> None:
+    """`kld` + "." should commit the top wubi candidate + "。".
+
+    Wbpy's candidates() merges wubi first, then pinyin, so the top
+    candidate is wubi-preferred.  When the user has typed a wubi code
+    and presses a punctuation key, the result must reflect that wubi
+    candidate -- not fall back to the raw pinyin buffer.
+    """
+    pinyin = Trie()
+    wubi = Trie()
+    wubi.insert("kld", "我", 100)
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    for ch in "kld":
+        mode.feed_key(_letter(ch), 0)
+    assert mode.buffer == "kld"
+
+    kv_period = IBus.keyval_from_name("period")
+    r = mode.feed_key(kv_period, 0)
+    assert r is not None
+    assert r.handled is True
+    # Top wubi candidate is "我"; commit + Chinese "。" -> "我。"
+    assert r.commit == "我。"
+    # Buffer cleared after commit (both halves reset).
+    assert mode.buffer == ""
+    assert mode._pinyin_mode is not None
+    assert mode._pinyin_mode.buffer == ""
+
+
+def test_wbpy_punct_full_table() -> None:
+    """Spot-check every punctuation mapping on the empty-buffer path."""
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    # Maps: IBus keysym name -> expected Chinese output.  These names
+    # must match the keys of google_pinyin_mode._ASCII_TO_CHINESE so
+    # our reuse-import actually pays off.
+    cases = [
+        ("period", "。"),
+        ("comma", "，"),
+        ("semicolon", "；"),
+        ("colon", "："),
+        ("question", "？"),
+        ("exclam", "！"),
+        ("less", "《"),
+        ("greater", "》"),
+        ("parenleft", "（"),
+        ("parenright", "）"),
+        ("bracketleft", "【"),
+        ("bracketright", "】"),
+        ("minus", "—"),
+        ("apostrophe", "\u2019"),
+        ("quotedbl", "\u201d"),
+    ]
+    for keysym_name, chinese in cases:
+        mode.reset()
+        kv = IBus.keyval_from_name(keysym_name)
+        assert kv != 0, f"IBus has no {keysym_name!r} keysym"
+        r = mode.feed_key(kv, 0)
+        assert r is not None, f"{keysym_name!r} was passed through (None returned)"
+        assert r.handled is True, f"{keysym_name!r} not handled by WbpyMode"
+        assert r.commit == chinese, (
+            f"{keysym_name!r} -> {r.commit!r}, expected {chinese!r}"
+        )
+
+
+def test_wbpy_non_punct_non_letter_passes_through() -> None:
+    """Escape / arrows / function keys must still be handed back to the
+    IBus engine for the app to process.  Only the 15 punctuation
+    keysyms should be intercepted -- everything else falls through to
+    the existing `return None` path."""
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    # Escape is keysym name "Escape" -- length 6, not a letter, not a tone,
+    # not a punctuation keysym.
+    kv_escape = IBus.keyval_from_name("Escape")
+    r = mode.feed_key(kv_escape, 0)
+    assert r is None, f"Escape should pass through, got {r!r}"
+    # Buffer unchanged.
+    assert mode.buffer == ""
+
+
+def test_wbpy_punct_with_empty_buffer_resets_state() -> None:
+    """After a punctuation commit, both sub-engines' buffers must be
+    empty so the next key starts a fresh composition."""
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    # Type a wubi code.
+    for ch in "kld":
+        mode.feed_key(_letter(ch), 0)
+    assert mode.buffer == "kld"
+
+    # Press period -> commits "我。" and resets.
+    mode.feed_key(IBus.keyval_from_name("period"), 0)
+
+    # All three buffers should be empty.
+    assert mode.buffer == ""
+    assert mode._wubi_mode is not None
+    assert mode._wubi_mode.buffer == ""
+    assert mode._pinyin_mode is not None
+    assert mode._pinyin_mode.buffer == ""
+
+    # Next letter starts fresh.
+    mode.feed_key(_letter("a"), 0)
+    assert mode.buffer == "a"

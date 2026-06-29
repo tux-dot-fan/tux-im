@@ -24,6 +24,7 @@ from gi.repository import IBus
 from tux_im.input.base import Candidate, InputMode, KeyResult
 from tux_im.input.lexicon import Trie
 from tux_im.input.wubi import WubiMode
+from tux_im.input.google_pinyin_mode import _ASCII_TO_CHINESE
 
 log = logging.getLogger(__name__)
 
@@ -96,6 +97,24 @@ class WbpyMode:
             return None
         ch = key.lower()
         if len(ch) != 1 or (not ch.isalpha() and ch not in "12345"):
+            # Not a letter, not a tone digit.  Two sub-cases:
+            #   1. Punctuation (keysym name in _ASCII_TO_CHINESE):
+            #      commit the current wbpy composition (wubi candidates
+            #      take priority over pinyin candidates per the merged
+            #      candidates() logic) and append the Chinese punctuation.
+            #      Without this, the user got raw ASCII "."/","/"?"/etc.
+            #      in wbpy mode — see fix(pinyin): commit 6243013.
+            #   2. Anything else (Escape, arrows, function keys, ...):
+            #      pass through so the IBus engine / app can handle it.
+            if key in _ASCII_TO_CHINESE:
+                # Mirror the with-buffer punctuation behaviour of the
+                # pinyin/google modes: commit current composition, then
+                # emit the Chinese punctuation.  An empty buffer just
+                # emits the punctuation (no candidate to commit).
+                committed = self.commit() or ""
+                chinese = _ASCII_TO_CHINESE[key]
+                self.reset()
+                return KeyResult(handled=True, commit=committed + chinese)
             return None
 
         is_tone = ch in "12345"
