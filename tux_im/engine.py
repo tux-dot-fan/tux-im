@@ -399,7 +399,34 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
                     return True
             return False
 
-        # 3. Hand the key to the active input mode.
+        # 3. Hand the key to the active input mode — but ONLY for plain
+        # keypresses (letters, digits, punctuation). Modifier keys (Ctrl,
+        # Alt, Super) belong to the application: Ctrl-C must copy /
+        # interrupt, Ctrl-V must paste, Alt-Tab must switch windows.
+        # Without this guard, every InputMode swallowed them as if they
+        # were bare letters, polluting the pinyin buffer with 'c', 'v',
+        # etc., and silently breaking every application shortcut that
+        # happened to involve a letter.
+        #
+        # Shift is INTENTIONALLY NOT in this mask: shifted letters
+        # (e.g. Shift+c -> 'C') are legitimate pinyin input, not
+        # application shortcuts.
+        if state & (
+            IBus.ModifierType.CONTROL_MASK
+            | IBus.ModifierType.MOD1_MASK
+            | IBus.ModifierType.SUPER_MASK
+            | IBus.ModifierType.HYPER_MASK
+        ):
+            # Modifier-bearing keypress.  Any composition in progress is
+            # discarded -- the user is reaching for an app shortcut, not
+            # finishing the current Chinese phrase.  This matches what
+            # fcitx5 / ibus-pinyin do.
+            if self._active_mode.buffer:
+                self._active_mode.reset()
+                self._refresh_preedit()
+            return False
+
+        # 4. Hand the key to the active input mode.
         result = self._active_mode.feed_key(keyval, state)
         if result is None:
             return False
