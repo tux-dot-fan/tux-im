@@ -39,6 +39,27 @@ _ASCII_TO_CHINESE = {
     "\"": "\u201d",  # " -> " (right double quote)
 }
 
+# IBus reports punctuation keys by their keysym name (e.g. the "." key is
+# reported as keyval_name "period", not "."), so we have to map names
+# back to ASCII before looking them up in _ASCII_TO_CHINESE.
+_KEYVAL_NAME_TO_ASCII = {
+    "period": ".",
+    "comma": ",",
+    "semicolon": ";",
+    "colon": ":",
+    "question": "?",
+    "exclam": "!",
+    "less": "<",
+    "greater": ">",
+    "parenleft": "(",
+    "parenright": ")",
+    "bracketleft": "[",
+    "bracketright": "]",
+    "minus": "-",
+    "apostrophe": "'",
+    "quotedbl": "\"",
+}
+
 
 class PinyinMode:
     """Buffers pinyin (with tone numbers) and looks up candidates in `PinyinTrie`.
@@ -69,8 +90,14 @@ class PinyinMode:
         if key is None:
             return None
         ch = key.lower()
-        log.debug("PinyinMode.feed_key: keyval=%d key=%r ch=%r buffer_before=%r",
-                  keyval, key, ch, self.buffer)
+        # IBus reports punctuation keys by keysym name ("period", "comma",
+        # ...). Map them back to the ASCII char the user actually typed
+        # so the lookup below works. `ch` is always a str here (we returned
+        # earlier if `key` was None), so the .get default is a valid str.
+        assert ch is not None
+        ascii_ch = _KEYVAL_NAME_TO_ASCII.get(key, ch)
+        log.debug("PinyinMode.feed_key: keyval=%d key=%r ch=%r ascii_ch=%r buffer_before=%r",
+                  keyval, key, ch, ascii_ch, self.buffer)
 
         # Digit tone
         if ch in _TONE_KEYS and self.buffer and self.buffer[-1].isalpha():
@@ -86,15 +113,19 @@ class PinyinMode:
             log.debug("PinyinMode.feed_key: letter, buffer=%r", self.buffer)
             return KeyResult(handled=True)
 
-        # Punctuation: commit current buffer and convert to Chinese equivalent.
-        # Empty buffer -> pass through so the app gets the raw ASCII.
-        if len(ch) == 1 and ch in _ASCII_TO_CHINESE:
+        # Punctuation: convert to Chinese equivalent. If there's a buffer
+        # (pinyin being composed), commit the current candidate first; if
+        # buffer is empty, emit the Chinese punctuation directly so the
+        # app never receives raw ASCII punctuation while in pinyin mode.
+        if len(ascii_ch) == 1 and ascii_ch in _ASCII_TO_CHINESE:
+            chinese = _ASCII_TO_CHINESE[ascii_ch]
             if not self.buffer:
-                return None
+                log.debug("PinyinMode.feed_key: punct %r -> empty buffer, emit %r",
+                          ascii_ch, chinese)
+                return KeyResult(handled=True, commit=chinese)
             committed = self.commit() or ""
-            chinese = _ASCII_TO_CHINESE[ch]
             log.debug("PinyinMode.feed_key: punct %r -> commit=%r + punct=%r",
-                      ch, committed, chinese)
+                      ascii_ch, committed, chinese)
             self.reset()
             return KeyResult(handled=True, commit=committed + chinese)
 

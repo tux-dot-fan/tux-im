@@ -339,3 +339,112 @@ def test_commit_first_returns_handled() -> None:
     r = mode.select(0)
     # select() returns KeyResult; handled should be True for pinyin
     assert isinstance(r.handled, bool)
+
+
+# ---------------------------------------------------------------------------
+# Pinyin punctuation conversion (Chinese-mode punctuation)
+# ---------------------------------------------------------------------------
+
+
+# Real IBus keyvals for US-keyboard punctuation. Hardcoded because
+# they're stable (X11 keysyms have been frozen for decades).
+_KV_PERIOD = 46
+_KV_COMMA = 44
+_KV_SEMICOLON = 59
+_KV_COLON = 58
+_KV_QUESTION = 63
+_KV_EXCLAM = 33
+_KV_LESS = 60
+_KV_GREATER = 62
+_KV_PARENLEFT = 40
+_KV_PARENRIGHT = 41
+_KV_BRACKETLEFT = 91
+_KV_BRACKETRIGHT = 93
+_KV_MINUS = 45
+_KV_APOSTROPHE = 39
+_KV_QUOTEDBL = 34
+
+
+def test_pinyin_punct_with_buffer_commits_top_then_chinese() -> None:
+    """`ni3` + period keyval should commit "你" + "。" (existing behavior)."""
+    trie = Trie()
+    trie.insert("ni3", "你", 100)
+    cfg = _FakeConfig()
+    mode = PinyinMode(trie, cfg)
+
+    mode.feed_key(_kv("n"), 0)
+    mode.feed_key(_kv("i"), 0)
+    mode.feed_key(_kv("3"), 0)
+
+    r = mode.feed_key(_KV_PERIOD, 0)
+    assert r is not None
+    assert r.handled is True
+    assert r.commit == "你。"
+    # Buffer cleared after commit.
+    assert mode.buffer == ""
+
+
+def test_pinyin_punct_empty_buffer_emits_chinese_not_ascii() -> None:
+    """REGRESSION: empty buffer + period keyval must emit "。" not pass through ".".
+
+    Before the fix:
+      1. PinyinMode.feed_key returned None for punctuation when the buffer
+         was empty, so the IBus engine forwarded the raw ASCII key to
+         the app.
+      2. The IBus punctuation keysym (e.g. keyval 46) is reported by name
+         as "period", not ".", so the old `ch in _ASCII_TO_CHINESE` check
+         never matched. Result: the entire punctuation branch was dead
+         code and the user got English punctuation in Chinese mode.
+    """
+    trie = Trie()
+    cfg = _FakeConfig()
+    mode = PinyinMode(trie, cfg)
+
+    # Buffer is empty -- this is the bug-trigger path.
+    r = mode.feed_key(_KV_PERIOD, 0)
+    assert r is not None, "feed_key must NOT return None for ASCII punctuation"
+    assert r.handled is True
+    assert r.commit == "。"
+
+
+def test_pinyin_punct_empty_buffer_full_table() -> None:
+    """Spot-check every punctuation mapping on the empty-buffer path."""
+    trie = Trie()
+    cfg = _FakeConfig()
+    mode = PinyinMode(trie, cfg)
+
+    cases = [
+        (_KV_PERIOD, "。"),
+        (_KV_COMMA, "，"),
+        (_KV_SEMICOLON, "；"),
+        (_KV_COLON, "："),
+        (_KV_QUESTION, "？"),
+        (_KV_EXCLAM, "！"),
+        (_KV_LESS, "《"),
+        (_KV_GREATER, "》"),
+        (_KV_PARENLEFT, "（"),
+        (_KV_PARENRIGHT, "）"),
+        (_KV_BRACKETLEFT, "【"),
+        (_KV_BRACKETRIGHT, "】"),
+        (_KV_MINUS, "—"),
+        (_KV_APOSTROPHE, "\u2019"),
+        (_KV_QUOTEDBL, "\u201d"),
+    ]
+    for kv, chinese in cases:
+        mode.reset()
+        r = mode.feed_key(kv, 0)
+        assert r is not None, f"keyval {kv} was passed through (None returned)"
+        assert r.handled is True, f"keyval {kv} not handled by PinyinMode"
+        assert r.commit == chinese, f"keyval {kv} -> {r.commit!r}, expected {chinese!r}"
+
+
+def test_pinyin_punct_keysym_name_not_unicode() -> None:
+    """Verify our fix targets the real IBus keysym (name "period"), not
+    the unicode codepoint lookup that was silently missing the match."""
+    from gi.repository import IBus
+    # Sanity: IBus reports the period key (keyval 46) as "period", not ".".
+    assert IBus.keyval_name(_KV_PERIOD) == "period"
+    # And "period" is not in _ASCII_TO_CHINESE — the table is keyed on the
+    # ASCII char. This is the exact reason the bug existed.
+    from tux_im.input.pinyin import _ASCII_TO_CHINESE
+    assert "period" not in _ASCII_TO_CHINESE
