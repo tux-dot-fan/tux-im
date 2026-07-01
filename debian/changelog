@@ -1,3 +1,26 @@
+tux-im (0.1.0-13) resolute; urgency=medium
+
+  * fix(pinyin): convert ASCII punctuation to Chinese in pinyin mode.
+    ',' '.' '/' ';' '[' ']' '\' '=' '-' '`' all typed in pinyin mode
+    were forwarded as ASCII, so sentences read as "你好,世界." instead
+    of "你好，世界。".  Now pinyin mode maps ASCII punctuation to the
+    matching fullwidth character at commit time, mirroring the
+    behaviour every other Chinese IME ships with.
+  * fix(wbpy): same ASCII→fullwidth punctuation conversion in wbpy
+    mode; same rationale.
+  * fix(engine): Ctrl/Alt/Super+letter shortcuts are passed through to
+    the application.  Previously process_key_event returned True for
+    any modifier-letter combo that wasn't an IBus navigation key, so
+    Ctrl+T / Alt+F4 / Super+L were swallowed by the engine and never
+    reached the focused window.  Now modifier-letter combos are
+    forwarded unconditionally.
+  * ci: changelog trailers for 0.1.0-11 and 0.1.0-12 were missing
+    the closing `-- Maintainer <mail>  date` line in the trim pipeline,
+    which made `dpkg-buildpackage` rewrite them on every build.  Bumped
+    to 0.1.0-13 to retire the malformed entries from history.
+
+ -- TUX IM contributors <tux-im@example.com>  Wed, 01 Jul 2026 19:55:00 +0000
+
 tux-im (0.1.0-12) resolute; urgency=medium
 
   * ci: drop the lint-fix auto-push job.  Main is now ruff-clean
