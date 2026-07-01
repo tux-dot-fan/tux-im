@@ -215,7 +215,7 @@ def test_shift_letter_reaches_input_mode(engine: object) -> None:
     a regression where someone 'be safe' adds Shift to the mask.
     """
     state = IBus.ModifierType.SHIFT_MASK
-    result = engine._handle_key(_kv("c"), state)
+    engine._handle_key(_kv("c"), state)
     mode = engine._active_mode  # type: ignore[attr-defined]
     assert mode.feed_calls == [(99, state)], (
         f"Shift+C must reach InputMode; got {mode.feed_calls}"
@@ -224,7 +224,7 @@ def test_shift_letter_reaches_input_mode(engine: object) -> None:
 
 def test_plain_letter_reaches_input_mode(engine: object) -> None:
     """Bare letter (no modifier) reaches InputMode as before.  Sanity check."""
-    result = engine._handle_key(_kv("n"), 0)
+    engine._handle_key(_kv("n"), 0)
     mode = engine._active_mode  # type: ignore[attr-defined]
     assert mode.feed_calls == [(_kv("n"), 0)]
 
@@ -232,7 +232,7 @@ def test_plain_letter_reaches_input_mode(engine: object) -> None:
 def test_bare_punctuation_reaches_input_mode(engine: object) -> None:
     """Bare punctuation reaches InputMode (committed via PinyinMode path)."""
     kv_period = IBus.keyval_from_name("period")
-    result = engine._handle_key(kv_period, 0)
+    engine._handle_key(kv_period, 0)
     mode = engine._active_mode  # type: ignore[attr-defined]
     assert mode.feed_calls == [(kv_period, 0)]
 

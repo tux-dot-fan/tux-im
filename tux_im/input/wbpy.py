@@ -22,9 +22,9 @@ gi.require_version("IBus", "1.0")
 from gi.repository import IBus
 
 from tux_im.input.base import Candidate, InputMode, KeyResult
+from tux_im.input.google_pinyin_mode import _ASCII_TO_CHINESE
 from tux_im.input.lexicon import Trie
 from tux_im.input.wubi import WubiMode
-from tux_im.input.google_pinyin_mode import _ASCII_TO_CHINESE
 
 log = logging.getLogger(__name__)
 

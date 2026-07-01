@@ -74,11 +74,18 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "N", "W", "UP", "B", "A", "C4", "PT", "RUF"]
-# RUF002/RUF003: ambiguous fullwidth characters (， （ ） etc.) — these
-# appear intentionally in Chinese-language comments and docstrings
-# throughout this IME.  Forcing ASCII would make the Chinese prose
-# look wrong.
-ignore = ["E501", "RUF002", "RUF003"]
+# RUF001/RUF002/RUF003: ambiguous fullwidth characters (， （ ） etc.).
+# RUF002/RUF003 fire in comments/docstrings — these appear intentionally
+# in Chinese-language prose throughout this IME and forcing ASCII
+# would make the Chinese text look wrong.
+# RUF001 fires in plain strings — most often the `_ASCII_TO_CHINESE`
+# mapping tables in tux_im/input/google_pinyin_mode.py and
+# tux_im/input/wbpy.py, and their test fixtures, which store
+# fullwidth punctuation by design.  Without this ignore, every
+# fixture tuple in tests/test_wbpy.py / test_engine_flow.py /
+# test_modifier_passthrough.py would lint-fail even though the
+# mapping IS the contract being tested.
+ignore = ["E501", "RUF001", "RUF002", "RUF003"]
 
 [tool.ruff.lint.per-file-ignores]
 # E402 on gi imports is intentional: gi.require_version() MUST come
