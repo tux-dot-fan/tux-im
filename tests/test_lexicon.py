@@ -295,8 +295,8 @@ def test_user_words_file_includes_scheme_column(tmp_path) -> None:
 
     lines = user_path.read_text(encoding="utf-8").strip().split("\n")
     assert len(lines) == 2
-    pinyin_line = [l for l in lines if "ni3" in l][0]
-    wubi_line = [l for l in lines if "kld" in l][0]
+    pinyin_line = next(line for line in lines if "ni3" in line)
+    wubi_line = next(line for line in lines if "kld" in line)
     assert pinyin_line.endswith("\tpinyin")
     assert wubi_line.endswith("\twubi")
 

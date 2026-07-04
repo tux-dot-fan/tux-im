@@ -17,7 +17,7 @@ CONFIG_PATH = CONFIG_DIR / "config.toml"
 
 @dataclass
 class IMESection:
-    default_mode: str = "pinyin"
+    default_mode: str = "wbpy"
     auto_punct: bool = True
     full_width_default: bool = False
     show_pinyin_in_preedit: bool = True
@@ -93,6 +93,8 @@ class UISection:
     overlay_offset_x: int = 0
     overlay_offset_y: int = 24
     font_size: int = 14
+    # IBus candidate list orientation: "horizontal" (default) or "vertical".
+    candidate_orientation: str = "horizontal"
 
 
 @dataclass
@@ -175,6 +177,7 @@ class Config:
                 "overlay_offset_x": self.ui.overlay_offset_x,
                 "overlay_offset_y": self.ui.overlay_offset_y,
                 "font_size": self.ui.font_size,
+                "candidate_orientation": self.ui.candidate_orientation,
             },
             "dictionary": {
                 "search_paths": self.dictionary.search_paths,

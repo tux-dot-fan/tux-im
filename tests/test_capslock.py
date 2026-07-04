@@ -127,18 +127,18 @@ def test_capslock_digit_is_not_letters(engine: object) -> None:
     assert engine.committed == []
 
 
-def test_capslock_with_shift_still_lowercased(engine: object) -> None:
-    """CapsLock + Shift: X11 reports lowercase keyval (Shift cancels Caps).
+def test_capslock_with_shift_uppercased(engine: object) -> None:
+    """CapsLock + Shift: Shift takes precedence over CapsLock.
 
-    Behaviourally the user sees the same lowercase character as without
-    Shift, so our normalisation path is exercised but the committed
-    character is lowercase.  This guards against a regression where the
-    engine would special-case Shift and forward the event unchanged.
+    Standard Windows/macOS/Linux behaviour: CapsLock alone → lower case;
+    CapsLock + Shift → upper case.  This guards that we emit 'C' not 'c'
+    when both modifiers are held, so the user's intentional Shift press
+    is respected.
     """
     state = IBus.ModifierType.LOCK_MASK | IBus.ModifierType.SHIFT_MASK
     result = engine._handle_key(_kv("C"), state)
     assert result is True
-    assert engine.committed == ["c"]
+    assert engine.committed == ["C"]
 
 
 def test_capslock_punctuation_unchanged(engine: object) -> None:

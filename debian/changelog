@@ -1,3 +1,14 @@
+tux-im (0.1.0-15) UNRELEASED; urgency=medium
+
+  * feat(config): default input mode changed from pinyin to wbpy
+  * feat(config): add candidate_orientation option (default: horizontal)
+  * feat(engine): set LookupTable orientation from config (horizontal by default)
+  * feat(engine): fix CapsLock+Shift to output uppercase (Shift takes precedence)
+  * feat(settings): add candidate orientation selector to appearance tab
+  * tests: update capslock shift test; update config default mode test
+
+ -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
+
 tux-im (0.1.0-14) UNRELEASED; urgency=medium
 
   * fix(lexicon): fix user word persistence — user words were lost on

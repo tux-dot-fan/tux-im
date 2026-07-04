@@ -135,19 +135,29 @@ class SettingsWindow:
         grid = Gtk.Grid(column_spacing=8, row_spacing=8)
         grid.set_border_width(16)
 
-        grid.attach(Gtk.Label(label="主题:", xalign=1), 0, 0, 1, 1)
+        # Candidate list orientation.
+        grid.attach(Gtk.Label(label="候选词方向:", xalign=1), 0, 0, 1, 1)
+        self._orient = Gtk.ComboBoxText()
+        for o in ("horizontal", "vertical"):
+            label = {"horizontal": "横向", "vertical": "纵向"}[o]
+            self._orient.append_text(label)
+        idx = ("horizontal", "vertical").index(self._config.ui.candidate_orientation)
+        self._orient.set_active(idx)
+        grid.attach(self._orient, 1, 0, 1, 1)
+
+        grid.attach(Gtk.Label(label="主题:", xalign=1), 0, 1, 1, 1)
         self._theme = Gtk.ComboBoxText()
         for t in ("system", "dark", "light"):
             self._theme.append_text(t)
         self._theme.set_active(("system", "dark", "light").index(self._config.ui.theme))
-        grid.attach(self._theme, 1, 0, 1, 1)
+        grid.attach(self._theme, 1, 1, 1, 1)
 
-        grid.attach(Gtk.Label(label="悬浮窗位置:", xalign=1), 0, 1, 1, 1)
+        grid.attach(Gtk.Label(label="悬浮窗位置:", xalign=1), 0, 2, 1, 1)
         self._overlay_pos = Gtk.ComboBoxText()
         for p in ("cursor", "fixed"):
             self._overlay_pos.append_text(p)
         self._overlay_pos.set_active(("cursor", "fixed").index(self._config.ui.overlay_position))
-        grid.attach(self._overlay_pos, 1, 1, 1, 1)
+        grid.attach(self._overlay_pos, 1, 2, 1, 1)
 
         return _wrap(grid)
 
@@ -191,6 +201,7 @@ class SettingsWindow:
             self._config.ui,
             theme=("system", "dark", "light")[self._theme.get_active()],
             overlay_position=("cursor", "fixed")[self._overlay_pos.get_active()],
+            candidate_orientation=("horizontal", "vertical")[self._orient.get_active()],
         )
         self._config.save()
         log.info("Config saved to %s", self._config.path)

@@ -76,5 +76,5 @@ def test_merge_all_sections_load() -> None:
 
     with tempfile.TemporaryDirectory() as td:
         cfg = Config.load(Path(td) / "missing.toml")
-    assert cfg.ime.default_mode == "pinyin"
+    assert cfg.ime.default_mode == "wbpy"
     assert cfg.dictionary.learn_enabled is True

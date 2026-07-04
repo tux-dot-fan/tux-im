@@ -421,20 +421,28 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             # Forcing a pass-through here would commit a capital letter
             # even though the user did NOT press Shift — most apps and
             # text fields interpret a bare CapsLock-on 'c' as lower case,
-            # so we follow that convention.  If Shift is held alongside
-            # CapsLock, the desktop typically reports the *lower*-case
-            # keyval (Shift cancels CapsLock), so the path below is
-            # naturally a no-op in that case.  Other keys (digits,
-            # punctuation) are unaffected and pass through unchanged.
+            # so we follow that convention.
+            #
+            # HOWEVER: if Shift is also held, Shift takes precedence over
+            # CapsLock and the keyval arrives as lower-case ('c').  In that
+            # case the user IS pressing Shift intentionally and we MUST emit
+            # an upper-case letter ('C'), not lower-case.  The standard
+            # Windows/macOS/Linux behaviour is: CapsLock alone → lower case;
+            # CapsLock + Shift → upper case.
             if state & IBus.ModifierType.LOCK_MASK:
                 keyname = IBus.keyval_name(keyval)
                 if len(keyname) == 1 and keyname.isalpha():
+                    # CapsLock alone → lower case; CapsLock + Shift → upper case.
+                    if state & IBus.ModifierType.SHIFT_MASK:
+                        commit_text = keyname.upper()
+                    else:
+                        commit_text = keyname.lower()
                     log.debug(
-                        "CapsLock engaged in latin mode: normalising %r -> %r",
-                        keyname, keyname.lower(),
+                        "CapsLock latin mode: normalising %r -> %r",
+                        keyname, commit_text,
                     )
                     self.commit_text(
-                        IBus.Text.new_from_string(keyname.lower())
+                        IBus.Text.new_from_string(commit_text)
                     )
                     log.debug("HANDLE branch=latin-capslock key=%s committed", keyname)
                     return True
@@ -551,7 +559,11 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
     def _build_lookup(self, cands: list[Candidate]) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
-        log.debug("_build_lookup: input cands=%r", [(c.text, c.display) for c in cands])
+        # Horizontal (0) by default — controlled by ui.candidate_orientation.
+        orient = 0 if _config.ui.candidate_orientation == "horizontal" else 1  # type: ignore[union-attr]
+        table.set_orientation(orient)
+        log.debug("_build_lookup: input cands=%r, orientation=%d",
+                  [(c.text, c.display) for c in cands], orient)
         for c in cands:
             display = c.display
             if c.comment:
