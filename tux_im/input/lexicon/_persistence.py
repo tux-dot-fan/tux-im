@@ -55,8 +55,13 @@ def load_rime_dict(path: Path) -> Iterator[tuple[str, str, int]]:
             yield word, code, int(freq)
 
 
-def _iter_user_words(path: Path) -> Iterator[tuple[str, str, int]]:
-    """Parse a user-word TSV file. Yields (word, code, freq)."""
+def _iter_user_words(path: Path) -> Iterator[tuple[str, str, int, str | None]]:
+    """Parse a user-word TSV file. Yields (word, code, freq, scheme).
+
+    The ``scheme`` column (``"pinyin"`` or ``"wubi"``) is optional for
+    backwards compatibility with 3-column files.  When absent, ``None``
+    is yielded and the caller must auto-detect.
+    """
     if not path.exists():
         return
     with path.open(encoding="utf-8") as fh:
@@ -65,18 +70,19 @@ def _iter_user_words(path: Path) -> Iterator[tuple[str, str, int]]:
             if not line or line.startswith("#"):
                 continue
             parts = line.split("\t")
-            if len(parts) != 3:
+            if len(parts) < 3 or len(parts) > 4:
                 log.warning("_iter_user_words: line %d in %s has %d fields, "
-                            "expected 3, skipping: %r", lineno, path, len(parts), line)
+                            "expected 3-4, skipping: %r", lineno, path, len(parts), line)
                 continue
-            word, code, freq_s = parts
+            word, code, freq_s = parts[0], parts[1], parts[2]
+            scheme = parts[3] if len(parts) == 4 else None
             try:
                 freq = int(freq_s)
             except ValueError:
                 log.warning("_iter_user_words: line %d: freq %r is not an int, skipping",
                            lineno, freq_s)
                 continue
-            yield word, code, freq
+            yield word, code, freq, scheme
 
 
 def _discover_dicts(

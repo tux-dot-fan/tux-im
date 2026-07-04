@@ -62,6 +62,20 @@ class ASRHandler:
         self._tick_id: int | None = None
         self._loop = asyncio.new_event_loop()
 
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:  # pragma: no cover
+            pass
+
+    def close(self) -> None:
+        """Clean up resources (event loop, timers)."""
+        if self._tick_id is not None:
+            GLib.source_remove(self._tick_id)
+            self._tick_id = None
+        if hasattr(self, "_loop") and not self._loop.is_closed():
+            self._loop.close()
+
     # ---- public API ----
 
     def start(self) -> None:

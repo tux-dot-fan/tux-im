@@ -72,12 +72,12 @@ def test_pinyin_type_and_commit() -> None:
     assert r is None or not r.commit
     assert mode.buffer == "ni3"
 
-    # Candidates should include both words
+    # Candidates should include both words.  After the fix,
+    # candidates() uses prefix lookup so "ni" matches "ni3" entries
+    # even before a tone digit is typed.
     cands = mode.candidates()
     texts = [c.text for c in cands]
-    # KNOWN BUG: pinyin.candidates() returns [] until a digit/tone is typed
-    # (see _PINYIN_SEPARATORS). Without a separator candidates are empty.
-    assert "你" in texts or len(cands) == 0  # bug: empty until tone typed
+    assert "你" in texts
 
     # Select first candidate (top rank = "你")
     r = mode.select(0)

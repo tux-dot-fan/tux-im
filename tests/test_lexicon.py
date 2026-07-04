@@ -100,8 +100,9 @@ def test_iter_user_words(tmp_path) -> None:
         "他\tha\t20\n"
     )
     entries = list(_iter_user_words(p))
-    # Order is file-order (comment lines skipped).
-    assert entries == [("你好", "ni3hao", 50), ("我", "wo3", 30), ("他", "ha", 20)]
+    # Order is file-order (comment lines skipped).  4th element (scheme)
+    # is None for 3-column legacy files.
+    assert entries == [("你好", "ni3hao", 50, None), ("我", "wo3", 30, None), ("他", "ha", 20, None)]
 
 
 def test_iter_user_words_bad_lines(tmp_path, caplog) -> None:
@@ -114,7 +115,7 @@ def test_iter_user_words_bad_lines(tmp_path, caplog) -> None:
         "ok2\tha\t20\n"
     )
     entries = list(_iter_user_words(p))
-    assert entries == [("good", "ni3", 10), ("ok2", "ha", 20)]
+    assert entries == [("good", "ni3", 10, None), ("ok2", "ha", 20, None)]
     # warnings were logged
     assert any("expected 3" in r.message for r in caplog.records)
     assert any("not an int" in r.message for r in caplog.records)
@@ -205,6 +206,126 @@ def test_lexicon_flush_no_path() -> None:
     lex._dirty = True
     # No user_words_path set because file doesn't exist and wasn't created.
     lex._user_words_path = None
+
+
+# ---------------------------------------------------------------------------
+# Regression: user words must survive restart and not bloat the file
+# ---------------------------------------------------------------------------
+
+
+def test_user_word_survives_restart_when_code_exists_in_system_dict(tmp_path) -> None:
+    """A user-learned word whose code already exists in the system trie
+    but whose word text does NOT must be inserted (not silently dropped)
+    on reload.
+
+    Before the fix: ``_load_user_words`` called ``boost(code, word)``
+    when ``exact(code)`` was True, but ``boost`` is a no-op when the
+    specific (code, word) pair is absent → the user word was lost.
+    """
+    from unittest.mock import MagicMock
+
+    user_path = tmp_path / "user_words.txt"
+    mock_config = MagicMock()
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = str(user_path)
+
+    # Session 1: system trie has "zhe2" → "哲", user learns "喆".
+    lex = Lexicon.load(mock_config)
+    lex.pinyin.insert("zhe2", "哲", 100)
+    lex.add_user_word("zhe2", "喆", freq=50, scheme="pinyin")
+    lex._flush_now()
+
+    # Session 2: fresh lexicon, system dict reloaded, user words merged.
+    mock_config2 = MagicMock()
+    mock_config2.dictionary.search_paths = []
+    mock_config2.dictionary.user_words_path = str(user_path)
+    lex2 = Lexicon.load(mock_config2)
+    lex2.pinyin.insert("zhe2", "哲", 100)
+
+    # The user word "喆" must still be present.
+    entries = {e.word for e in lex2.pinyin.lookup("zhe2")}
+    assert "喆" in entries, f'user word lost on restart: {entries}'
+    assert "哲" in entries, f'system word missing: {entries}'
+
+
+def test_user_words_file_does_not_include_system_entries(tmp_path) -> None:
+    """_write_user_words must only persist user-learned entries, not the
+    entire system dictionary.
+
+    Before the fix: ``_write_user_words`` iterated every entry in the
+    trie (including system dict entries), causing the user words file
+    to grow unboundedly with the full system dictionary on every flush.
+    """
+    from unittest.mock import MagicMock
+
+    user_path = tmp_path / "user_words.txt"
+    mock_config = MagicMock()
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = str(user_path)
+
+    lex = Lexicon.load(mock_config)
+    # Simulate a system dictionary with many entries.
+    for i in range(100):
+        lex.pinyin.insert(f"code{i}", f"word{i}", freq=i)
+    # User learns only one word.
+    lex.add_user_word("ni3", "你", freq=10, scheme="pinyin")
+    lex._flush_now()
+
+    # The file should contain only the user entry, not 100 system entries.
+    lines = user_path.read_text(encoding="utf-8").strip().split("\n")
+    assert len(lines) == 1, f'expected 1 line, got {len(lines)}: {lines}'
+    assert "你" in lines[0]
+    assert "ni3" in lines[0]
+    assert "pinyin" in lines[0]  # scheme column
+
+
+def test_user_words_file_includes_scheme_column(tmp_path) -> None:
+    """The 4th column (scheme) is written so reload can route correctly."""
+    from unittest.mock import MagicMock
+
+    user_path = tmp_path / "user_words.txt"
+    mock_config = MagicMock()
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = str(user_path)
+
+    lex = Lexicon.load(mock_config)
+    lex.add_user_word("ni3", "你", freq=10, scheme="pinyin")
+    lex.add_user_word("kld", "我", freq=20, scheme="wubi")
+    lex._flush_now()
+
+    lines = user_path.read_text(encoding="utf-8").strip().split("\n")
+    assert len(lines) == 2
+    pinyin_line = [l for l in lines if "ni3" in l][0]
+    wubi_line = [l for l in lines if "kld" in l][0]
+    assert pinyin_line.endswith("\tpinyin")
+    assert wubi_line.endswith("\twubi")
+
+
+def test_detect_scheme_pinyin_with_tone() -> None:
+    """Codes with digits are always pinyin."""
+    from unittest.mock import MagicMock
+    mock_config = MagicMock()
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = "/dev/null"
+    lex = Lexicon.load(mock_config)
+    assert lex._detect_scheme("ni3") == "pinyin"
+    assert lex._detect_scheme("hao3") == "pinyin"
+
+
+def test_detect_scheme_wubi_pure_letters() -> None:
+    """Pure-letter codes that are wubi prefixes (and not pinyin prefixes)
+    are detected as wubi."""
+    from unittest.mock import MagicMock
+    mock_config = MagicMock()
+    mock_config.dictionary.search_paths = []
+    mock_config.dictionary.user_words_path = "/dev/null"
+    lex = Lexicon.load(mock_config)
+    # Populate wubi trie with a known prefix.
+    lex.wubi.insert("kld", "我", 100)
+    assert lex._detect_scheme("kld") == "wubi"
+    # A code that is neither in wubi nor pinyin defaults to pinyin
+    # (covers Google Pinyin buffers without tone digits).
+    assert lex._detect_scheme("nihao") == "pinyin"
 
 
 # ---------------------------------------------------------------------------

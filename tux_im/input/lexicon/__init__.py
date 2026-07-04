@@ -61,6 +61,9 @@ class Lexicon:
     _user_words_path: Path = field(default=None, repr=False)  # type: ignore[assignment]
     _dirty: bool = field(default=False, repr=False)
     _flush_timer: Callable[[], bool] | None = field(default=None, repr=False)
+    # Tracks (code, word) pairs added by the user so that _write_user_words
+    # only persists learned entries — not the entire system dictionary.
+    _user_entries: set[tuple[str, str]] = field(default_factory=set, repr=False)
 
     @classmethod
     def load(cls, config: Config) -> Lexicon:
@@ -89,20 +92,37 @@ class Lexicon:
     def _load_user_words(self, path: Path) -> int:
         """Parse a user-word TSV file and merge entries into the tries.
 
-        Each line: ``word<tab>code<tab>freq``.
+        Each line: ``word<tab>code<tab>freq[<tab>scheme]``.
         Already-present entries are boosted by the stored freq.
         Unknown entries are inserted with the stored freq.
         Returns the number of entries processed.
         """
         n = 0
-        for word, code, freq in _iter_user_words(path):
-            trie = self.pinyin if any(c.isdigit() for c in code) else self.wubi
-            if trie.exact(code):
+        for word, code, freq, scheme in _iter_user_words(path):
+            if scheme is None:
+                scheme = self._detect_scheme(code)
+            trie = self.pinyin if scheme == "pinyin" else self.wubi
+            self._user_entries.add((code, word))
+            if trie.has_entry(code, word):
                 trie.boost(code, word, delta=freq)
             else:
                 trie.insert(code, word, freq=freq)
             n += 1
         return n
+
+    def _detect_scheme(self, code: str) -> str:
+        """Auto-detect pinyin vs wubi from code shape.
+
+        Pinyin codes contain tone digits (``ni3``, ``hao3``); wubi codes
+        are pure letters (``kld``, ``ycfg``).  For pure-letter codes
+        (e.g. Google Pinyin buffers without tones), default to pinyin
+        unless the code is a known wubi prefix and not a pinyin prefix.
+        """
+        if any(c.isdigit() for c in code):
+            return "pinyin"
+        if self.wubi.has_prefix(code) and not self.pinyin.has_prefix(code):
+            return "wubi"
+        return "pinyin"
 
     def _schedule_flush(self) -> None:
         """Mark lexicon dirty and schedule an async write to disk (debounced).
@@ -129,8 +149,8 @@ class Lexicon:
             path.parent.mkdir(parents=True, exist_ok=True)
             with tmp.open("w", encoding="utf-8") as fh:
                 # Write pinyin entries first, then wubi.
-                self._write_user_words(fh, self.pinyin)
-                self._write_user_words(fh, self.wubi)
+                self._write_user_words(fh, self.pinyin, "pinyin")
+                self._write_user_words(fh, self.wubi, "wubi")
             os.replace(tmp, path)  # atomic on POSIX
             self._dirty = False
             log.debug("User words persisted to %s", path)
@@ -142,21 +162,42 @@ class Lexicon:
                 except OSError:
                     pass
 
-    @staticmethod
-    def _write_user_words(fh: IO[str], trie: Trie) -> None:
-        """Write every entry in ``trie`` as a TSV line."""
+    def _write_user_words(self, fh: IO[str], trie: Trie, scheme: str) -> None:
+        """Write only user-learned entries from ``trie`` as TSV lines.
+
+        The ``scheme`` column (``"pinyin"`` or ``"wubi"``) is written
+        so that ``_load_user_words`` can route entries correctly on the
+        next startup without relying on code-shape heuristics.
+        """
         written: set[tuple[str, str]] = set()
         for entry in trie.iter_words():
-            key = (entry.word, entry.code)
+            key = (entry.code, entry.word)
+            if key not in self._user_entries:
+                continue
             if key in written:
                 continue
             written.add(key)
-            fh.write(f"{entry.word}\t{entry.code}\t{entry.freq}\n")
+            fh.write(f"{entry.word}\t{entry.code}\t{entry.freq}\t{scheme}\n")
 
-    def add_user_word(self, code: str, word: str, freq: int = 100) -> None:
-        """Add a user-learned word. Detects pinyin vs wubi by code shape."""
-        if any(c.isdigit() for c in code):
+    def add_user_word(
+        self, code: str, word: str, freq: int = 100, scheme: str | None = None
+    ) -> None:
+        """Add a user-learned word.
+
+        Args:
+            code: The input code (buffer contents).
+            word: The committed word.
+            freq: Frequency score.
+            scheme: ``"pinyin"`` or ``"wubi"``.  When ``None``, the
+                scheme is auto-detected from the code shape.  Passing
+                the scheme explicitly avoids misrouting Google Pinyin
+                buffers (which lack tone digits) to the wubi trie.
+        """
+        if scheme is None:
+            scheme = self._detect_scheme(code)
+        if scheme == "pinyin":
             self.pinyin.insert(code, word, freq)
         else:
             self.wubi.insert(code, word, freq)
+        self._user_entries.add((code, word))
         self._schedule_flush()

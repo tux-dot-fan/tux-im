@@ -151,7 +151,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             # Learn: space commits the top candidate implicitly.
             # Route through add_user_word so persistence is triggered.
             if _config and _config.dictionary.learn_enabled and _lexicon:
-                _lexicon.add_user_word(buf, result)
+                _lexicon.add_user_word(buf, result, scheme=self._learn_scheme())
         self._active_mode.reset()
         self.hide_preedit_text()
         self.hide_auxiliary_text()
@@ -173,7 +173,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             # Learn: boost the selected entry so it ranks higher next time.
             # Route through add_user_word so persistence is triggered.
             if _config and _config.dictionary.learn_enabled and _lexicon and buf:
-                _lexicon.add_user_word(buf, result.commit)
+                _lexicon.add_user_word(buf, result.commit, scheme=self._learn_scheme())
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
@@ -341,6 +341,21 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
     def _select_n(self, index: int) -> Callable[[object], bool]:
         return lambda *_a: self.select_candidate(index)
 
+    def _learn_scheme(self) -> str:
+        """Determine which trie (pinyin/wubi) to learn into.
+
+        ``wubi`` mode always learns into the wubi trie.  All other modes
+        (``pinyin``, ``google``, ``wbpy``) learn into the pinyin trie —
+        even ``wbpy``, because the visible buffer mirrors the pinyin
+        engine and a tone-digit-free buffer would be misrouted by the
+        old code-shape heuristic.
+        """
+        try:
+            mode_name = self._active_mode.name
+        except AttributeError:
+            return "pinyin"
+        return "wubi" if mode_name == "wubi" else "pinyin"
+
     def do_process_key_event(
         self, keyval: int, keycode: int, state: int
     ) -> bool:
@@ -366,13 +381,21 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
     def _handle_key(self, keyval: int, state: int) -> bool:
         self._lazy_init()
+        keyname = IBus.keyval_name(keyval) or f"0x{keyval:x}"
+        log.debug(
+            "HANDLE key=%s state=0x%x chinese=%s buffer=%r",
+            keyname, state, self._chinese_mode,
+            getattr(self._active_mode, "buffer", "") if self._initialized else "",
+        )
 
         # 1. Shortcuts first — this includes Caps_Lock (toggle_en_cn) which must
         # work regardless of chinese_mode so it CAN toggle that flag.
         consumed = _shortcuts.handle(self, keyval, state)  # type: ignore[union-attr]
         if consumed:
+            log.debug("HANDLE branch=shortcut-consumed key=%s -> True", keyname)
             self._refresh_preedit()
             return True
+        log.debug("HANDLE branch=shortcut-miss key=%s -> fallthrough", keyname)
 
         # 2. In Latin mode, let everything else pass through to the app.
         if not self._chinese_mode:
@@ -396,7 +419,9 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
                     self.commit_text(
                         IBus.Text.new_from_string(keyname.lower())
                     )
+                    log.debug("HANDLE branch=latin-capslock key=%s committed", keyname)
                     return True
+            log.debug("HANDLE branch=latin-passthrough key=%s -> False", keyname)
             return False
 
         # 3. Hand the key to the active input mode — but ONLY for plain
@@ -411,16 +436,30 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         # Shift is INTENTIONALLY NOT in this mask: shifted letters
         # (e.g. Shift+c -> 'C') are legitimate pinyin input, not
         # application shortcuts.
-        if state & (
+        mod_mask = (
             IBus.ModifierType.CONTROL_MASK
             | IBus.ModifierType.MOD1_MASK
             | IBus.ModifierType.SUPER_MASK
             | IBus.ModifierType.HYPER_MASK
-        ):
+        )
+        if state & mod_mask:
             # Modifier-bearing keypress.  Any composition in progress is
             # discarded -- the user is reaching for an app shortcut, not
             # finishing the current Chinese phrase.  This matches what
             # fcitx5 / ibus-pinyin do.
+            mods = []
+            if state & IBus.ModifierType.CONTROL_MASK:
+                mods.append("Ctrl")
+            if state & IBus.ModifierType.MOD1_MASK:
+                mods.append("Alt")
+            if state & IBus.ModifierType.SUPER_MASK:
+                mods.append("Super")
+            if state & IBus.ModifierType.HYPER_MASK:
+                mods.append("Hyper")
+            log.debug(
+                "HANDLE branch=modifier-passthrough key=%s mods=%s -> False",
+                keyname, "+".join(mods),
+            )
             if self._active_mode.buffer:
                 self._active_mode.reset()
                 self._refresh_preedit()
@@ -429,6 +468,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         # 4. Hand the key to the active input mode.
         result = self._active_mode.feed_key(keyval, state)
         if result is None:
+            log.debug("HANDLE branch=mode-returned-None key=%s -> False", keyname)
             return False
 
         if result.commit is not None:
@@ -436,6 +476,10 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         if result.clear:
             self._active_mode.reset()
         self._refresh_preedit()
+        log.debug(
+            "HANDLE branch=mode-handled key=%s handled=%s commit=%r clear=%s -> %s",
+            keyname, result.handled, result.commit, result.clear, result.handled,
+        )
         return result.handled
 
     # ---- Preedit / candidates ----

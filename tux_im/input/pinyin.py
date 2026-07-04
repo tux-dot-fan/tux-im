@@ -191,6 +191,20 @@ class PinyinMode:
             segments[-1] = segments[-1] + tone
         return segments
 
+    def _lookup_entries(self, code: str) -> list[LexEntry]:
+        """Look up entries for a code, falling back to prefix search.
+
+        When the code is a complete syllable in the trie (e.g. ``ni3``),
+        ``lookup`` returns the exact entries.  When the user is still
+        typing (e.g. ``ni`` without a tone digit), ``lookup`` returns
+        empty and we fall back to ``lookup_prefix`` which collects all
+        entries whose code starts with the partial input.
+        """
+        entries = self._trie.lookup(code)
+        if not entries:
+            entries = self._trie.lookup_prefix(code)
+        return entries
+
     def commit(self) -> str | None:
         if not self.buffer:
             return None
@@ -200,8 +214,9 @@ class PinyinMode:
         parts: list[str] = []
         for seg in segments:
             # Trie keys include the tone digit (ni3, hao3).  Pass the full
-            # syllable so the correct entry is found.
-            entries = self._trie.lookup(seg)
+            # syllable so the correct entry is found.  Fall back to prefix
+            # search for partial syllables (e.g. "ni" without tone).
+            entries = self._lookup_entries(seg)
             if entries:
                 parts.append(entries[0].word)
             else:
@@ -223,9 +238,9 @@ class PinyinMode:
         if not segments:
             return []
         first = segments[0]
-        # Trie keys include the tone digit (ni3, hao3).  Pass the full
-        # syllable to lookup so the correct entry is found.
-        entries = self._trie.lookup(first)
+        # Use _lookup_entries so partial pinyin (e.g. "ni" without tone)
+        # still shows candidates via prefix search.
+        entries = self._lookup_entries(first)
         cands = [_entry_to_candidate(e) for e in entries]
         return cands[self._page_offset : self._page_offset + limit]
 
@@ -237,14 +252,14 @@ class PinyinMode:
         if not segments:
             return KeyResult(handled=False)
         first = segments[0]
-        # Trie keys include the tone digit (ni3, hao3).  Pass the full
-        # syllable so the correct entry is found.
-        entries = self._trie.lookup(first)
-        if not (0 <= index < len(entries)):
+        entries = self._lookup_entries(first)
+        # Account for page offset so second-page selections land correctly.
+        pos = self._page_offset + index
+        if not (0 <= pos < len(entries)):
             return KeyResult(handled=False)
-        parts = [entries[index].word]
+        parts = [entries[pos].word]
         for seg in segments[1:]:
-            tail = self._trie.lookup(seg)
+            tail = self._lookup_entries(seg)
             parts.append(tail[0].word if tail else seg)
         return KeyResult(handled=True, commit="".join(parts), clear=True)
 

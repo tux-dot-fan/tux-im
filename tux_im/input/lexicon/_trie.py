@@ -100,6 +100,43 @@ class Trie:
             node = node.children[ch]
         return node.is_word
 
+    def has_entry(self, code: str, word: str) -> bool:
+        """Check if a specific (code, word) entry exists in the trie."""
+        code = code.lower().strip()
+        node = self._root
+        for ch in code:
+            if ch not in node.children:
+                return False
+            node = node.children[ch]
+        if not node.is_word:
+            return False
+        return any(e.word == word for e in node.entries)
+
+    def lookup_prefix(self, prefix: str) -> list[LexEntry]:
+        """Return all entries whose code starts with ``prefix``.
+
+        Unlike ``lookup`` which requires an exact code match, this
+        collects entries from every terminal node in the subtree rooted
+        at the prefix node.  Used by PinyinMode so the user sees
+        candidates while still typing a partial syllable (e.g. "ni"
+        matches "ni3", "ni4", …).
+        """
+        prefix = prefix.lower().strip()
+        node = self._root
+        for ch in prefix:
+            if ch not in node.children:
+                return []
+            node = node.children[ch]
+        result: list[LexEntry] = []
+        stack = [node]
+        while stack:
+            n = stack.pop()
+            if n.is_word:
+                result.extend(n.entries)
+            for child in n.children.values():
+                stack.append(child)
+        return result
+
     def iter_words(self) -> Iterator[LexEntry]:
         stack = [(self._root, "")]
         while stack:

@@ -64,12 +64,13 @@ class WubiMode:
         return cands[self._page_offset : self._page_offset + limit]
 
     def select(self, index: int) -> KeyResult:
-        # Grab all candidates and apply _page_offset so second-page
-        # selections (e.g. key "1" when on page 2) land on the right entry.
-        all_cands = self.candidates(limit=9999)
+        # Index directly into the trie entries, applying _page_offset so
+        # second-page selections (e.g. key "1" when on page 2) land on
+        # the right entry.  Avoids building a large Candidate list.
+        entries = self._trie.lookup(self.buffer)
         pos = self._page_offset + index
-        if 0 <= pos < len(all_cands):
-            return KeyResult(handled=True, commit=all_cands[pos].text, clear=True)
+        if 0 <= pos < len(entries):
+            return KeyResult(handled=True, commit=entries[pos].word, clear=True)
         return KeyResult(handled=False)
 
     def page(self, direction: int) -> KeyResult:

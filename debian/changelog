@@ -1,4 +1,29 @@
-tux-im (0.1.0-13) resolute; urgency=medium
+tux-im (0.1.0-14) UNRELEASED; urgency=medium
+
+  * fix(lexicon): fix user word persistence — user words were lost on
+    restart when the code existed in the system trie but the specific
+    word text was absent (boost was a no-op, not insert).  Also fixed
+    file bloat: _write_user_words previously iterated the entire system
+    trie and persisted every entry, causing unbounded file growth on
+    each flush.  Now uses _user_entries set to track only learned words.
+  * fix(lexicon): add scheme routing for user word persistence.  All
+    non-wubi modes (pinyin, google, wbpy) now route to the pinyin trie
+    to avoid misrouting Google Pinyin tone-free buffers to wubi.
+  * fix(trie): add has_entry(code, word) to check for specific entries,
+    and lookup_prefix(prefix) for prefix-based fallback search.
+  * fix(pinyin): candidates() now falls back to lookup_prefix when the
+    exact code has no entries, so partial pinyin like "ni" shows "你"
+    before the tone digit is typed.
+  * fix(pinyin): select() now indexes entries with _page_offset so
+    second-page selections (e.g. key "1" on page 2) land on the
+    correct candidate instead of the first page's first entry.
+  * fix(wubi): optimize select() to index directly from trie lookup
+    results, avoiding the overhead of building a full Candidate list.
+  * fix(asr): ASRHandler.close() now closes the asyncio event loop to
+    avoid resource leaks on repeated ASR cycles.
+  * tests: add regression tests for user word survival, file size
+    bounds, scheme column persistence, and candidates/select index
+    consistency across all pages.
 
   * fix(pinyin): convert ASCII punctuation to Chinese in pinyin mode.
     ',' '.' '/' ';' '[' ']' '\' '=' '-' '`' all typed in pinyin mode

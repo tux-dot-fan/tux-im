@@ -166,6 +166,9 @@ class ShortcutManager:
             return False
         for parsed, action in self._bindings:
             if parsed.matches(keyval, state):
-                log.debug("shortcut matched: action=%s keyval=%d", action, keyval)
+                log.debug(
+                    "shortcut matched: action=%s keyval=%d (%s) state=0x%x",
+                    action, keyval, IBus.keyval_name(keyval) or "?", state,
+                )
                 return self._call_handler(action, engine)
         return False
