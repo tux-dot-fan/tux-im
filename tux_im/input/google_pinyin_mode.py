@@ -208,7 +208,7 @@ def _get_decoder() -> _Decoder:
 
 # ── ASCII punctuation → Chinese ───────────────────────────────────────────────
 
-_ASCII_TO_CHINESE = {
+_ASCII_TO_CHINESE_KEYSYM = {
     "period": "\u3002",
     "comma": "\uff0c",
     "semicolon": "\uff1b",
@@ -225,6 +225,9 @@ _ASCII_TO_CHINESE = {
     "apostrophe": "\u2019",
     "quotedbl": "\u201d",
 }
+
+# Alias for backwards compatibility (some callers use the old name).
+_ASCII_TO_CHINESE = _ASCII_TO_CHINESE_KEYSYM
 
 
 # ── GooglePinyinMode ──────────────────────────────────────────────────────────

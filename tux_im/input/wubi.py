@@ -43,7 +43,7 @@ class WubiMode:
             return None
         ch = key.lower()
         if len(ch) != 1 or ch not in _WUBI_KEYS or len(self.buffer) >= _MAX_WUBI_LEN:
-            return None
+            return None if ch in _WUBI_KEYS else KeyResult(handled=False)
         # Check whether the buffer (after appending) is at least a prefix of
         # some wubi code. If not -- and especially if we have no buffer at all
         # yet -- this key would never resolve to a candidate, so return

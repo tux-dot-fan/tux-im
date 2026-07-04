@@ -61,6 +61,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         self._page_index: int = 0
         self._chinese_prop_key: str = "tux-im:chinese"
         self._chinese_prop: IBus.Property | None = None
+        self._mode_props: dict[str, IBus.Property] = {}
         self._initialized: bool = False
 
     def _lazy_init(self) -> None:
@@ -100,6 +101,20 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         self._active_mode = self._make_mode(name)
         self._refresh_preedit()
         self._update_chinese_prop()
+        self._update_mode_prop_check()
+
+    def _update_mode_prop_check(self) -> None:
+        """Mark the current mode's property as CHECKED; all others as UNCHECKED."""
+        if not self._initialized:
+            return
+        try:
+            current = self._active_mode.name
+        except AttributeError:
+            return
+        for name, prop in self._mode_props.items():
+            state = IBus.PropState.CHECKED if name == current else IBus.PropState.UNCHECKED
+            prop.set_state(state)
+            self.update_property(prop)
 
     def cycle_mode(self, *_args: object) -> bool:
         log.debug("cycle_mode handler entered")
@@ -239,6 +254,8 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         log.debug("focus_in: properties registered")
         self.register_properties(prop_list)
         log.debug("focus_in: done")
+        # Mark the current mode as checked in the property list.
+        self._update_mode_prop_check()
 
     def do_focus_out(self) -> None:
         try:
@@ -556,6 +573,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
     def _build_prop_list(self) -> IBus.PropList:
         prop_list = IBus.PropList.new()
         log.debug("_build_prop_list: creating props for modes %s, chinese_mode=%s", list(ENGINES_BY_MODE.keys()), self._chinese_mode)
+        self._mode_props.clear()
         for name in ENGINES_BY_MODE:
             prop = IBus.Property.new(
                 f"tux-im:{name}",
@@ -568,6 +586,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
                 IBus.PropState.UNCHECKED,
             )
             prop_list.append(prop)
+            self._mode_props[name] = prop
         label = self._input_mode_label()
         state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
         log.debug("_build_prop_list: InputMode prop label=%s state=%s", label, state)

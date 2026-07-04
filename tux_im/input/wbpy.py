@@ -22,7 +22,7 @@ gi.require_version("IBus", "1.0")
 from gi.repository import IBus
 
 from tux_im.input.base import Candidate, InputMode, KeyResult
-from tux_im.input.google_pinyin_mode import _ASCII_TO_CHINESE
+from tux_im.input.google_pinyin_mode import _ASCII_TO_CHINESE_KEYSYM
 from tux_im.input.lexicon import Trie
 from tux_im.input.wubi import WubiMode
 
@@ -106,13 +106,15 @@ class WbpyMode:
             #      in wbpy mode — see fix(pinyin): commit 6243013.
             #   2. Anything else (Escape, arrows, function keys, ...):
             #      pass through so the IBus engine / app can handle it.
-            if key in _ASCII_TO_CHINESE:
+            # _ASCII_TO_CHINESE_KEYSYM uses keysym names as keys (e.g. "period"),
+            # so the direct lookup works.
+            if key in _ASCII_TO_CHINESE_KEYSYM:
                 # Mirror the with-buffer punctuation behaviour of the
                 # pinyin/google modes: commit current composition, then
                 # emit the Chinese punctuation.  An empty buffer just
                 # emits the punctuation (no candidate to commit).
                 committed = self.commit() or ""
-                chinese = _ASCII_TO_CHINESE[key]
+                chinese = _ASCII_TO_CHINESE_KEYSYM[key]
                 self.reset()
                 return KeyResult(handled=True, commit=committed + chinese)
             return None
@@ -120,63 +122,55 @@ class WbpyMode:
         is_tone = ch in "12345"
         wubi_handled = False
         pinyin_handled = False
-        # The pinyin engine is the source of truth for the visible
-        # buffer (it accepts letters AND tone digits, returns a
-        # full-sentence candidate).  We let it own its own buffer
-        # via its own feed_key.  The wubi engine's buffer is a
-        # derived view that is RESET every time a tone digit
-        # appears in the input: wubi codes never contain digits, so
-        # a tone digit marks the end of the previous wubi attempt
-        # and the start of a new one (or just a pinyin segment).
-        # This way "ni3kld" → wubi buffer is "kld", not "nikld".
-        #
-        # Length cap: 19 consecutive "c" crashes libgooglepinyin's
-        # internal MatrixSearch with assertion failure.  The
-        # library's own im_set_max_lens caps at 30 but a single
-        # all-consonant buffer of ~19 letters still trips an
-        # internal assert in dict match.  Cap the pinyin engine's
-        # buffer at 16 (a reasonable pinyin sentence length: ~6
-        # letters per syllable × 2-3 syllables).
+
+        # Length cap: 19 consecutive letters crashes libgooglepinyin's
+        # internal MatrixSearch with assertion failure.  Cap at 16.
         _max_pinyin_len = 16
         if (
             self._pinyin_mode is not None
             and len(self._pinyin_mode.buffer) >= _max_pinyin_len
             and not is_tone
         ):
-            # Reject the letter — don't pass it to the pinyin
-            # engine.  Still update the wubi half so the candidate
-            # panel doesn't go stale.
+            # Reject the letter — don't pass it to the pinyin engine.
             if self._wubi_mode is not None:
-                if is_tone:
-                    self._wubi_mode.buffer = ""
-                else:
-                    self._wubi_mode.buffer += ch
+                self._wubi_mode.buffer += ch
                 wubi_handled = True
             self.buffer = self._pinyin_mode.buffer
             self.cursor = len(self.buffer)
             return KeyResult(handled=wubi_handled)
+
         if self._pinyin_mode is not None:
+            # Save pre-state before pinyin mode may mutate the buffer.
+            pre_len = len(self._pinyin_mode.buffer)
             res = self._pinyin_mode.feed_key(keyval, state)
             pinyin_handled = bool(res and res.handled)
+
         if self._wubi_mode is not None:
             if is_tone:
-                # Tone digit: wubi segment boundary.  Reset wubi
-                # buffer to empty so the next letter starts a new
-                # wubi code.
-                self._wubi_mode.buffer = ""
+                # Only consume a tone digit (1-5) if the buffer before this
+                # key ended with a letter (valid pinyin syllable).  Otherwise
+                # pass it through so the app receives the digit.
+                # We saved pre_len above, so check pre-buffer via length
+                # comparison: if buffer grew by exactly 1 and the new char
+                # is a digit, tone was accepted.
+                if (
+                    pinyin_handled
+                    and len(self._pinyin_mode.buffer) == pre_len + 1
+                    and self._pinyin_mode.buffer[-1] in "12345"
+                ):
+                    self._wubi_mode.buffer = ""
+                    wubi_handled = True
+                # else: pinyin rejected or consumed differently → pass through
             else:
-                # Letter: append to the wubi buffer.  We assign
-                # directly rather than calling wubi.feed_key so
-                # the 4-char cap and prefix-validity checks do not
-                # cause the two halves to drift out of sync.
+                # Letter: append to the wubi buffer.
                 self._wubi_mode.buffer += ch
-            wubi_handled = True
+                wubi_handled = True
         # The visible buffer mirrors the pinyin engine's buffer.
-        self.buffer = self._pinyin_mode.buffer
+        self.buffer = self._pinyin_mode.buffer if self._pinyin_mode else ""
         self.cursor = len(self.buffer)
         if wubi_handled or pinyin_handled:
             return KeyResult(handled=True)
-        return None
+        return KeyResult(handled=False)
 
     def candidates(self, limit: int = 9) -> list[Candidate]:
         if not self.buffer:

@@ -99,14 +99,18 @@ class PinyinMode:
         log.debug("PinyinMode.feed_key: keyval=%d key=%r ch=%r ascii_ch=%r buffer_before=%r",
                   keyval, key, ch, ascii_ch, self.buffer)
 
-        # Digit tone
+        # Digit tone: only consume 1-5 if the buffer is non-empty and
+        # ends with a letter.  An empty buffer means there's nothing to
+        # apply a tone to — pass the key through so "1" etc. reach the app.
         if ch in _TONE_KEYS and self.buffer and self.buffer[-1].isalpha():
             self.buffer += ch
             self.cursor = len(self.buffer)
             log.debug("PinyinMode.feed_key: tone digit, buffer=%r", self.buffer)
             return KeyResult(handled=True)
 
-        # Letter
+        # Letter: pass through to the app if no wubi prefix matches —
+        # e.g. in wubi mode typing "1" (not a wubi key) should reach the app.
+        # Return False so IBus does NOT consume the key.
         if len(ch) == 1 and ch in _PINYIN_KEYS:
             self.buffer += ch
             self.cursor = len(self.buffer)
