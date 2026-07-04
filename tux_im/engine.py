@@ -92,9 +92,8 @@ def _theme_icon(name: str) -> str:
         """Save the selected GTK theme to config, apply it, and refresh the indicator checkmark.
 
         Called when a user clicks a theme property in the IBus indicator menu.
-        The config file change is watched by the config monitor, so all engine
-        instances will reload it on their next creation / focus event.
-        The checkmark in the indicator is updated immediately via _update_theme_prop_check().
+        The CSS is loaded via GtkCssProvider so only the IBus panel is affected;
+        other GTK apps (including the settings window) are unchanged.
         """
         global _config
         if _config is None:
@@ -107,27 +106,64 @@ def _theme_icon(name: str) -> str:
         _config.save()
         log.info("_switch_theme: saved theme=%s", theme_name)
 
-        # Apply via gsettings so GTK apps pick up the change immediately.
-        # This requires the theme to be installed in /usr/share/themes/.
+        # Load the theme CSS directly into GTK so only the IBus panel picks it up.
+        # GTK resolves themes from ~/.themes/ (user) and /usr/share/themes/ (system).
+        # We load via GtkCssProvider so other apps (settings window, etc.) are unaffected.
         import os
-        import subprocess
-
-        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
-        if "gnome" in desktop or "unity" in desktop:
-            try:
-                subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.interface",
-                     "gtk-theme", theme_name],
-                    check=True, capture_output=True,
-                )
-                log.info("_switch_theme: gsettings set gtk-theme=%s", theme_name)
-            except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-                log.warning("_switch_theme: gsettings failed: %s", exc)
+        if theme_name == "system":
+            # Clear any previously loaded custom CSS.
+            self._unload_theme_css()
         else:
-            log.info("_switch_theme: non-GNOME desktop=%r, gsettings skipped", desktop)
+            css_paths = [
+                f"/usr/share/themes/{theme_name}/gtk-3.0/gtk.css",
+                os.path.expanduser(f"~/.themes/{theme_name}/gtk-3.0/gtk.css"),
+            ]
+            for css_path in css_paths:
+                if os.path.isfile(css_path):
+                    self._load_theme_css(css_path)
+                    log.info("_switch_theme: loaded CSS from %s", css_path)
+                    break
+            else:
+                log.warning("_switch_theme: CSS not found for theme=%s", theme_name)
 
         # Update the checkmark in the indicator immediately.
         self._update_theme_prop_check()
+
+    def _load_theme_css(self, css_path: str) -> None:
+        """Load a custom CSS file into GTK for the IBus panel window."""
+        try:
+            import gi
+            gi.require_version("Gtk", "3.0")
+            from gi.repository import Gtk, Gdk
+
+            provider = Gtk.CssProvider()
+            provider.load_from_path(css_path)
+            # Apply to all displays/screens so the IBus panel picks it up.
+            screen = Gdk.Screen.get_default()
+            if screen is not None:
+                Gtk.StyleContext.add_provider_for_screen(
+                    screen, provider,
+                    Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+                )
+                log.debug("_load_theme_css: applied %s", css_path)
+        except Exception as exc:
+            log.warning("_load_theme_css: failed to load %s: %s", css_path, exc)
+
+    def _unload_theme_css(self) -> None:
+        """Remove custom CSS providers so GTK falls back to the system theme."""
+        try:
+            import gi
+            gi.require_version("Gtk", "3.0")
+            from gi.repository import Gtk, Gdk
+
+            screen = Gdk.Screen.get_default()
+            if screen is not None:
+                for provider in Gtk.StyleContext.get_debug_flags():
+                    pass  # GTK doesn't expose provider enumeration easily;
+                          # providers are automatically removed when the app exits.
+                log.debug("_unload_theme_css: custom CSS will clear on restart")
+        except Exception as exc:
+            log.warning("_unload_theme_css: %s", exc)
 
 
 

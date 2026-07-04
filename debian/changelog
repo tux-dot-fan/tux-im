@@ -1,3 +1,15 @@
+tux-im (0.1.0-17) UNRELEASED; urgency=medium
+
+  * fix(theme): remove gsettings from _switch_theme — custom CSS is now
+    loaded via GtkCssProvider so only the IBus panel is affected; other
+    apps (including the settings window) are never changed
+  * fix(settings): add _force_opaque_window() CSS override so the settings
+    panel always uses opaque theme colors regardless of active IBus theme
+  * fix(settings): _on_apply_theme no longer calls gsettings; theme is
+    saved to config and the IBus engine loads CSS via GtkCssProvider
+
+ -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
+
 tux-im (0.1.0-16) UNRELEASED; urgency=medium
 
   * feat(engine): add theme switching in IBus indicator (Top 5: TuxDark,

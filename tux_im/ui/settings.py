@@ -3,14 +3,12 @@
 from __future__ import annotations
 
 import logging
-import os
-import subprocess
 import sys
 
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
 
 from tux_im.config.config import Config
 
@@ -22,12 +20,63 @@ TUX_THEMES = ["system", "TuxDark", "TuxLight", "TuxRetro",
                   "Frost", "Forest", "Sunset", "Solarized",
                   "Catppuccin", "Nord", "Dracula", "RosePine"]
 
+# The config instance used by this settings window process.
+# Updated by _on_apply_theme to persist theme changes.
+_config_for_settings: Config | None = None
+
+
+def _force_opaque_window() -> None:
+    """Override any transparent background on the settings window.
+
+    When a TuxIM custom theme is active via gsettings (set by the indicator
+    switcher), the settings window would otherwise inherit its transparent
+    background.  This CSS forces an opaque background so the settings UI
+    is always readable, regardless of what theme is currently active.
+    """
+    try:
+        css_provider = Gtk.CssProvider()
+        # "!important" overrides any theme's transparent rgba() background.
+        css_provider.load_from_data(
+            b"""
+            @binding-set settings-window-bindings {
+                bind "<Alt>space" { "insert-at-cursor"(" ") }
+            }
+            GtkWindow {
+                background-color: @theme_bg_color !important;
+                color: @theme_fg_color;
+            }
+            GtkLabel {
+                background-color: transparent;
+                color: @theme_fg_color;
+            }
+            GtkButton, GtkComboBox, GtkEntry, GtkGrid, GtkNotebook, GtkBox {
+                background-color: @theme_bg_color;
+                color: @theme_fg_color;
+            }
+            """
+        )
+        screen = Gdk.Screen.get_default()
+        if screen is not None:
+            Gtk.StyleContext.add_provider_for_screen(
+                screen, css_provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
+            )
+    except Exception as exc:
+        log.warning("_force_opaque_window: %s", exc)
+
 
 class SettingsWindow:
     """A `Gtk.Window` with a notebook of settings tabs."""
 
     def __init__(self, config: Config) -> None:
+        global _config_for_settings
+        _config_for_settings = config
         self._config = config
+
+        # Force the settings window to use opaque theme colors, overriding
+        # any transparent custom IBus themes that may be active via gsettings.
+        _force_opaque_window()
+
         self.win = Gtk.Window(title="TUX IM 设置")
         self.win.set_default_size(560, 420)
         self.win.set_border_width(8)
@@ -198,31 +247,30 @@ class SettingsWindow:
         return _wrap(grid)
 
     def _on_apply_theme(self, _btn: object) -> None:
-        """Apply the selected GTK theme via gsettings (GNOME) or similar."""
+        """Save the theme to config (IBus picks it up on next focus).
+
+        Theme CSS is loaded via GtkCssProvider in the IBus engine so it only
+        affects the IBus panel — the settings window and other apps are unchanged.
+        """
         theme_name = TUX_THEMES[self._gtk_theme.get_active()]
+        from dataclasses import replace
+        global _config_for_settings
+        if _config_for_settings is not None:
+            _config_for_settings = replace(
+                _config_for_settings,
+                ui=replace(_config_for_settings.ui, theme=theme_name),
+            )
+            _config_for_settings.save()
+            log.info("_on_apply_theme: saved theme=%s", theme_name)
+
         if theme_name == "system":
-            self._theme_status.set_label("已设为跟随系统主题。")
-            return
-
-        success = False
-        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
-
-        # Try GNOME (gsettings)
-        if "gnome" in desktop or "unity" in desktop:
-            try:
-                subprocess.run(
-                    ["gsettings", "set", "org.gnome.desktop.interface",
-                     "gtk-theme", theme_name],
-                    check=True, capture_output=True,
-                )
-                success = True
-                msg = f"已将 GTK 主题设为 {theme_name}。请重启 IBus 或重新登录。"
-            except (subprocess.CalledProcessError, FileNotFoundError):
-                msg = f"gsettings 失败，请手动设置 GTK 主题为 {theme_name}。"
+            self._theme_status.set_label(
+                "已设为跟随系统主题。IBus 将在下次焦点时生效。"
+            )
         else:
-            msg = f"请在系统设置中将 GTK 主题改为 {theme_name}。"
-
-        self._theme_status.set_label(msg)
+            self._theme_status.set_label(
+                f"已保存为 {theme_name}。IBus 将在下次焦点时应用新样式。"
+            )
 
     def _build_about_tab(self) -> Gtk.Box:
         from tux_im import __version__
