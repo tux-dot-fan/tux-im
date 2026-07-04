@@ -1,3 +1,11 @@
+tux-im (0.1.0-16) UNRELEASED; urgency=medium
+
+  * fix(settings): make combo index lookups resilient to unknown config values
+    (e.g. theme="Catppuccin" from a previous version now safely falls back
+    to index 0 instead of crashing the settings panel)
+
+ -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
+
 tux-im (0.1.0-15) UNRELEASED; urgency=medium
 
   * feat(config): default input mode changed from pinyin to wbpy

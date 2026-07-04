@@ -141,7 +141,10 @@ class SettingsWindow:
         for o in ("horizontal", "vertical"):
             label = {"horizontal": "横向", "vertical": "纵向"}[o]
             self._orient.append_text(label)
-        idx = ("horizontal", "vertical").index(self._config.ui.candidate_orientation)
+        try:
+            idx = ("horizontal", "vertical").index(self._config.ui.candidate_orientation)
+        except ValueError:
+            idx = 0
         self._orient.set_active(idx)
         grid.attach(self._orient, 1, 0, 1, 1)
 
@@ -149,14 +152,22 @@ class SettingsWindow:
         self._theme = Gtk.ComboBoxText()
         for t in ("system", "dark", "light"):
             self._theme.append_text(t)
-        self._theme.set_active(("system", "dark", "light").index(self._config.ui.theme))
+        try:
+            idx = ("system", "dark", "light").index(self._config.ui.theme)
+        except ValueError:
+            idx = 0
+        self._theme.set_active(idx)
         grid.attach(self._theme, 1, 1, 1, 1)
 
         grid.attach(Gtk.Label(label="悬浮窗位置:", xalign=1), 0, 2, 1, 1)
         self._overlay_pos = Gtk.ComboBoxText()
         for p in ("cursor", "fixed"):
             self._overlay_pos.append_text(p)
-        self._overlay_pos.set_active(("cursor", "fixed").index(self._config.ui.overlay_position))
+        try:
+            idx = ("cursor", "fixed").index(self._config.ui.overlay_position)
+        except ValueError:
+            idx = 0
+        self._overlay_pos.set_active(idx)
         grid.attach(self._overlay_pos, 1, 2, 1, 1)
 
         return _wrap(grid)
