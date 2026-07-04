@@ -1,0 +1,111 @@
+/* TuxRetro — classic warm retro theme for IBus panel
+   Background: warm parchment (#faf6ec)
+   Accent:   vermilion orange (#e64a19)
+   Text:     dark sepia (#3e2723)
+   Highlight: warm amber (#f57c00)
+   Font:     serif + sans-serif mix for classic feel, 14px
+*/
+
+/* ---- Root widget ---- */
+window#IBusPanelWindow,
+IBusPanelWidget,
+IBusPanelApplet {
+    background-color: rgba(250, 246, 236, 0.97);
+    border: 1px solid rgba(158, 110, 60, 0.35);
+    border-radius: 4px;
+    box-shadow: 0 3px 12px rgba(62, 39, 35, 0.18),
+                0 1px 4px rgba(62, 39, 35, 0.10);
+    color: #3e2723;
+    font-family: "Noto Serif CJK SC", "WenQuanYi Zen Hei", "Songti SC", serif;
+    font-size: 14px;
+}
+
+/* ---- Lookup table container ---- */
+IBusLookupTable,
+.candidate-popup-content {
+    background-color: transparent;
+    padding: 4px 8px;
+    spacing: 0;
+}
+
+/* ---- Each candidate row ---- */
+.candidate-box {
+    padding: 3px 10px;
+    margin: 1px 3px;
+    border-radius: 2px;
+    background-color: transparent;
+    color: #3e2723;
+    border: 1px solid transparent;
+    transition: background-color 100ms ease,
+                border-color 100ms ease;
+}
+
+.candidate-box:hover {
+    background-color: rgba(230, 74, 25, 0.08);
+    border-color: rgba(230, 74, 25, 0.20);
+    color: #bf360c;
+}
+
+.candidate-box:selected,
+.candidate-box:active {
+    background-color: rgba(245, 124, 0, 0.15);
+    border-color: rgba(245, 124, 0, 0.45);
+    color: #bf360c;
+}
+
+/* ---- Index / shortcut number ---- */
+.candidate-index {
+    padding: 0 6px 0 0;
+    color: rgba(230, 74, 25, 0.55);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+/* ---- Highlighted index ---- */
+.candidate-box:selected .candidate-index,
+.candidate-box:active .candidate-index {
+    color: #e64a19;
+}
+
+/* ---- Candidate text ---- */
+.candidate-text {
+    color: #3e2723;
+    font-size: 14px;
+}
+
+/* ---- Preedit / input area ---- */
+IBusPreedit,
+IBusPreeditText {
+    padding: 2px 5px;
+    color: #3e2723;
+    font-size: 15px;
+    background-color: transparent;
+}
+
+/* ---- Page navigation ---- */
+.candidate-page-button-box {
+    padding: 2px 4px;
+}
+
+.candidate-page-button {
+    padding: 2px 5px;
+    color: rgba(230, 74, 25, 0.60);
+    border-radius: 2px;
+}
+
+.candidate-page-button:hover {
+    background-color: rgba(230, 74, 25, 0.08);
+    color: #e64a19;
+}
+
+/* ---- Orientation: horizontal ---- */
+.horizontal .candidate-box {
+    padding: 3px 12px;
+    margin: 1px 3px;
+}
+
+/* ---- Orientation: vertical ---- */
+.vertical .candidate-box {
+    padding: 3px 14px;
+    margin: 1px 3px;
+}

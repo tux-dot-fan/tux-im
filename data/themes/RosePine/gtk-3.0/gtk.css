@@ -1,0 +1,83 @@
+/* Rose Pine — soft warm dark theme for IBus panel
+   Background: Rose Pine base (#191724)
+   Accent:   Rose Pine mauve (#c4a7e7)
+   Text:     Rose Pine text (#e0def4)
+   Highlight: Rose Pine surface (#2a2838)
+   Based on the Rosé Pine color scheme (rosepinetheme.com)
+*/
+
+:root {
+    --bg: #191724;
+    --border: rgba(196, 167, 231, 0.20);
+    --text: #e0def4;
+    --accent: #c4a7e7;
+    --accent-dim: rgba(196, 167, 231, 0.22);
+    --hover-bg: rgba(196, 167, 231, 0.10);
+    --sel-bg: rgba(196, 167, 231, 0.28);
+    --sel-border: rgba(196, 167, 231, 0.45);
+}
+
+window#IBusPanelWindow,
+IBusPanelWidget,
+IBusPanelApplet {
+    background-color: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55),
+                0 2px 8px rgba(0, 0, 0, 0.35);
+    color: var(--text);
+    font-family: "Noto Sans CJK SC", "WenQuanYi Micro Hei", "PingFang SC", sans-serif;
+    font-size: 14px;
+}
+
+IBusLookupTable,
+.candidate-popup-content {
+    background-color: transparent;
+    padding: 6px 14px;
+    border-radius: 0 0 8px 8px;
+}
+
+.candidate-box {
+    padding: 3px 10px;
+    border-radius: 5px;
+    background-color: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    border: 1px solid transparent;
+}
+
+.candidate-box:hover {
+    background-color: var(--hover-bg);
+}
+
+.candidate-box:selected {
+    background-color: var(--sel-bg);
+    box-shadow: inset 0 0 0 1px var(--sel-border);
+    color: #ffffff;
+}
+
+.candidate-index {
+    color: var(--accent);
+    font-weight: 700;
+    padding-right: 4px;
+    font-size: 12px;
+}
+
+.candidate-index:selected {
+    color: #ffffff;
+}
+
+.candidate-text {
+    color: inherit;
+}
+
+.candidate-text:selected {
+    color: #ffffff;
+}
+
+.label-horizontal {
+    padding: 0 4px;
+}
+
+.label-vertical {
+    padding: 2px 0;
+}

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
 import sys
 
 import gi
@@ -15,6 +17,10 @@ from tux_im.config.config import Config
 log = logging.getLogger(__name__)
 
 MODES = ["pinyin", "wubi", "wbpy"]
+ORIENTATIONS = ["horizontal", "vertical"]
+TUX_THEMES = ["system", "TuxDark", "TuxLight", "TuxRetro",
+                  "Frost", "Forest", "Sunset", "Solarized",
+                  "Catppuccin", "Nord", "Dracula", "RosePine"]
 
 
 class SettingsWindow:
@@ -132,24 +138,91 @@ class SettingsWindow:
         return _wrap(grid)
 
     def _build_appearance_tab(self) -> Gtk.Box:
-        grid = Gtk.Grid(column_spacing=8, row_spacing=8)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=10)
         grid.set_border_width(16)
 
-        grid.attach(Gtk.Label(label="主题:", xalign=1), 0, 0, 1, 1)
-        self._theme = Gtk.ComboBoxText()
-        for t in ("system", "dark", "light"):
-            self._theme.append_text(t)
-        self._theme.set_active(("system", "dark", "light").index(self._config.ui.theme))
-        grid.attach(self._theme, 1, 0, 1, 1)
+        # --- Candidate orientation ---
+        grid.attach(Gtk.Label(label="候选词方向:", xalign=1), 0, 0, 1, 1)
+        self._orient_combo = Gtk.ComboBoxText()
+        for o in ORIENTATIONS:
+            label = {"horizontal": "横向", "vertical": "纵向"}[o]
+            self._orient_combo.append_text(label)
+        idx = ORIENTATIONS.index(self._config.ui.candidate_orientation) \
+            if self._config.ui.candidate_orientation in ORIENTATIONS else 0
+        self._orient_combo.set_active(idx)
+        grid.attach(self._orient_combo, 1, 0, 1, 1)
 
-        grid.attach(Gtk.Label(label="悬浮窗位置:", xalign=1), 0, 1, 1, 1)
-        self._overlay_pos = Gtk.ComboBoxText()
-        for p in ("cursor", "fixed"):
-            self._overlay_pos.append_text(p)
-        self._overlay_pos.set_active(("cursor", "fixed").index(self._config.ui.overlay_position))
-        grid.attach(self._overlay_pos, 1, 1, 1, 1)
+        # --- GTK Theme for IBus panel ---
+        grid.attach(Gtk.Label(label="候选框主题:", xalign=1), 0, 1, 1, 1)
+        self._gtk_theme = Gtk.ComboBoxText()
+        for t in TUX_THEMES:
+            label = {
+                "system":      "跟随系统",
+                "TuxDark":    "TuxDark (暗色)",
+                "TuxLight":   "TuxLight (亮色)",
+                "TuxRetro":   "TuxRetro (复古)",
+                "Frost":      "Frost (冰蓝)",
+                "Forest":     "Forest (森林)",
+                "Sunset":     "Sunset (暖橙)",
+                "Solarized":  "Solarized",
+                "Catppuccin": "Catppuccin (紫灰)",
+                "Nord":       "Nord (北极蓝)",
+                "Dracula":    "Dracula (紫红)",
+                "RosePine":   "RosePine (玫瑰粉)",
+            }[t]
+            self._gtk_theme.append_text(label)
+        idx = TUX_THEMES.index(self._config.ui.theme) \
+            if self._config.ui.theme in TUX_THEMES else 0
+        self._gtk_theme.set_active(idx)
+        grid.attach(self._gtk_theme, 1, 1, 1, 1)
+
+        # --- Apply theme button ---
+        self._theme_status = Gtk.Label(label="")
+        self._theme_status.set_halign(Gtk.Align.START)
+        grid.attach(self._theme_status, 1, 2, 1, 1)
+
+        apply_btn = Gtk.Button(label="应用主题")
+        apply_btn.connect("clicked", self._on_apply_theme)
+        grid.attach(apply_btn, 0, 2, 1, 1)
+
+        # --- Info note ---
+        note = Gtk.Label(
+            label="提示: 主题修改后需要重启 IBus 或重新登录才能生效。\n"
+            "候选词方向立即生效，但建议重启 IBus。"
+        )
+        note.set_halign(Gtk.Align.START)
+        note.set_line_wrap(True)
+        note.set_max_width_chars(48)
+        grid.attach(note, 0, 3, 2, 1)
 
         return _wrap(grid)
+
+    def _on_apply_theme(self, _btn: object) -> None:
+        """Apply the selected GTK theme via gsettings (GNOME) or similar."""
+        theme_name = TUX_THEMES[self._gtk_theme.get_active()]
+        if theme_name == "system":
+            self._theme_status.set_label("已设为跟随系统主题。")
+            return
+
+        success = False
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+
+        # Try GNOME (gsettings)
+        if "gnome" in desktop or "unity" in desktop:
+            try:
+                subprocess.run(
+                    ["gsettings", "set", "org.gnome.desktop.interface",
+                     "gtk-theme", theme_name],
+                    check=True, capture_output=True,
+                )
+                success = True
+                msg = f"已将 GTK 主题设为 {theme_name}。请重启 IBus 或重新登录。"
+            except (subprocess.CalledProcessError, FileNotFoundError):
+                msg = f"gsettings 失败，请手动设置 GTK 主题为 {theme_name}。"
+        else:
+            msg = f"请在系统设置中将 GTK 主题改为 {theme_name}。"
+
+        self._theme_status.set_label(msg)
 
     def _build_about_tab(self) -> Gtk.Box:
         from tux_im import __version__
@@ -189,8 +262,8 @@ class SettingsWindow:
         # UI.
         self._config.ui = replace(
             self._config.ui,
-            theme=("system", "dark", "light")[self._theme.get_active()],
-            overlay_position=("cursor", "fixed")[self._overlay_pos.get_active()],
+            theme=TUX_THEMES[self._gtk_theme.get_active()],
+            candidate_orientation=ORIENTATIONS[self._orient_combo.get_active()],
         )
         self._config.save()
         log.info("Config saved to %s", self._config.path)

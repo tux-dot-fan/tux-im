@@ -45,6 +45,92 @@ ENGINES_BY_MODE: dict[str, type] = {
 INPUT_MODE_PROP_KEY: str = "InputMode"
 
 
+# All bundled IBus GTK3 panel themes.
+# Top-N themes shown directly in the IBus indicator menu.
+# Full list is available in the Settings → Appearance tab.
+INDICATOR_THEMES = [
+    "TuxDark",
+    "TuxLight",
+    "TuxRetro",
+    "Frost",
+    "Catppuccin",
+]
+
+# All bundled themes (including those only accessible via Settings).
+THEMES = INDICATOR_THEMES + [
+    "Forest",
+    "Sunset",
+    "Solarized",
+    "Nord",
+    "Dracula",
+    "RosePine",
+]
+
+# Unicode block characters used as visual color swatches in the IBus indicator
+# menu for each theme.  These appear as the symbol/icon beside each theme name.
+_THEME_ICONS: dict[str, str] = {
+    "TuxDark":     "\U0001f532",   # 🔲 dark blue square
+    "TuxLight":    "\U0001f4a1",   # 💡 light yellow bulb
+    "TuxRetro":    "\U0001f4bf",   # 💿 warm brown cd-rom
+    "Frost":       "\U0001f4a8",   # 💨 icy snowflake
+    "Forest":      "\U0001f332",   # 🌲 pine/forest green
+    "Sunset":      "\U0001f307",   # 🌇 sunset orange
+    "Solarized":   "\U0001f331",   # 🌱 fresh green
+    "Catppuccin":  "\U0001f5a5",   # 🖥 purple monitor
+    "Nord":        "\U00002601",   # ☀ icy sun-blue
+    "Dracula":     "\U0001f47a",   # 👺 red demon
+    "RosePine":    "\U0001f338",   # 🌸 cherry blossom pink
+}
+
+
+def _theme_icon(name: str) -> str:
+    """Return the Unicode icon string for a theme name."""
+    return _THEME_ICONS.get(name, "")
+
+
+    def _switch_theme(self, theme_name: str) -> None:
+        """Save the selected GTK theme to config, apply it, and refresh the indicator checkmark.
+
+        Called when a user clicks a theme property in the IBus indicator menu.
+        The config file change is watched by the config monitor, so all engine
+        instances will reload it on their next creation / focus event.
+        The checkmark in the indicator is updated immediately via _update_theme_prop_check().
+        """
+        global _config
+        if _config is None:
+            log.warning("_switch_theme: _config not initialized, skipping")
+            return
+
+        # Update and persist the config.
+        from dataclasses import replace
+        _config = replace(_config, ui=replace(_config.ui, theme=theme_name))
+        _config.save()
+        log.info("_switch_theme: saved theme=%s", theme_name)
+
+        # Apply via gsettings so GTK apps pick up the change immediately.
+        # This requires the theme to be installed in /usr/share/themes/.
+        import os
+        import subprocess
+
+        desktop = os.environ.get("XDG_CURRENT_DESKTOP", "").lower()
+        if "gnome" in desktop or "unity" in desktop:
+            try:
+                subprocess.run(
+                    ["gsettings", "set", "org.gnome.desktop.interface",
+                     "gtk-theme", theme_name],
+                    check=True, capture_output=True,
+                )
+                log.info("_switch_theme: gsettings set gtk-theme=%s", theme_name)
+            except (subprocess.CalledProcessError, FileNotFoundError) as exc:
+                log.warning("_switch_theme: gsettings failed: %s", exc)
+        else:
+            log.info("_switch_theme: non-GNOME desktop=%r, gsettings skipped", desktop)
+
+        # Update the checkmark in the indicator immediately.
+        self._update_theme_prop_check()
+
+
+
 class TuxEngine(IBus.Engine):  # type: ignore[misc]
     """Main IBus engine for TUX IM."""
 
@@ -62,6 +148,7 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         self._chinese_prop_key: str = "tux-im:chinese"
         self._chinese_prop: IBus.Property | None = None
         self._mode_props: dict[str, IBus.Property] = {}
+        self._theme_props: dict[str, IBus.Property] = {}
         self._initialized: bool = False
 
     def _lazy_init(self) -> None:
@@ -113,6 +200,21 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             return
         for name, prop in self._mode_props.items():
             state = IBus.PropState.CHECKED if name == current else IBus.PropState.UNCHECKED
+            prop.set_state(state)
+            self.update_property(prop)
+
+    def _update_theme_prop_check(self) -> None:
+        """Mark the current theme as CHECKED; all others as UNCHECKED.
+
+        This updates the check mark in the indicator menu.  The actual
+        GTK theme takes effect when the engine is recreated on the next
+        focus event, after the config has been saved.
+        """
+        if not self._initialized or not self._theme_props:
+            return
+        current_theme = _config.ui.theme if _config else "system"
+        for name, prop in self._theme_props.items():
+            state = IBus.PropState.CHECKED if name == current_theme else IBus.PropState.UNCHECKED
             prop.set_state(state)
             self.update_property(prop)
 
@@ -254,8 +356,9 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         log.debug("focus_in: properties registered")
         self.register_properties(prop_list)
         log.debug("focus_in: done")
-        # Mark the current mode as checked in the property list.
+        # Mark the current mode and theme as checked in the property list.
         self._update_mode_prop_check()
+        self._update_theme_prop_check()
 
     def do_focus_out(self) -> None:
         try:
@@ -351,6 +454,15 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         if bare in ENGINES_BY_MODE:
             self.set_mode(bare)
             return
+
+        # Theme switch: "tux-im:theme:<name>"
+        # Only INDICATOR_THEMES are registered in the indicator menu.
+        if prop_name.startswith("tux-im:theme:"):
+            theme_name = prop_name.removeprefix("tux-im:theme:")
+            if theme_name in INDICATOR_THEMES:
+                self._switch_theme(theme_name)
+            return
+
         if prop_name == INPUT_MODE_PROP_KEY:
             self.toggle_chinese()
             return
@@ -551,7 +663,11 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
     def _build_lookup(self, cands: list[Candidate]) -> IBus.LookupTable:
         table = IBus.LookupTable.new(9, 0, True, False)
-        log.debug("_build_lookup: input cands=%r", [(c.text, c.display) for c in cands])
+        # Horizontal (0) by default — set in config.ui.candidate_orientation.
+        orient = 0 if _config.ui.candidate_orientation == "horizontal" else 1  # type: ignore[union-attr]
+        table.set_orientation(orient)
+        log.debug("_build_lookup: input cands=%r, orientation=%d",
+                  [(c.text, c.display) for c in cands], orient)
         for c in cands:
             display = c.display
             if c.comment:
@@ -572,7 +688,10 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
 
     def _build_prop_list(self) -> IBus.PropList:
         prop_list = IBus.PropList.new()
-        log.debug("_build_prop_list: creating props for modes %s, chinese_mode=%s", list(ENGINES_BY_MODE.keys()), self._chinese_mode)
+        log.debug("_build_prop_list: creating props for modes %s, chinese_mode=%s",
+                  list(ENGINES_BY_MODE.keys()), self._chinese_mode)
+
+        # --- Input mode properties ---
         self._mode_props.clear()
         for name in ENGINES_BY_MODE:
             prop = IBus.Property.new(
@@ -587,6 +706,54 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             )
             prop_list.append(prop)
             self._mode_props[name] = prop
+
+        # --- Separator before theme section ---
+        sep = IBus.Property.new(
+            "tux-im:sep1",
+            IBus.PropType.SEPARATOR,
+            IBus.Text.new_from_string(""),
+            "",
+            IBus.Text.new_from_string(""),
+            False,
+            False,
+            IBus.PropState.UNCHECKED,
+        )
+        prop_list.append(sep)
+
+        # --- Theme selection properties (Top 5 shown in IBus indicator) ---
+        # Full list in Settings → Appearance tab.
+        current_theme = _config.ui.theme if _config else "system"
+        self._theme_props.clear()
+        for name in INDICATOR_THEMES:
+            # Use a small colored block char as the visual marker for each theme.
+            state = IBus.PropState.CHECKED if name == current_theme else IBus.PropState.UNCHECKED
+            prop = IBus.Property.new(
+                f"tux-im:theme:{name}",
+                IBus.PropType.NORMAL,
+                IBus.Text.new_from_string(name),
+                "",
+                IBus.Text.new_from_string(_theme_icon(name)),
+                True,
+                True,
+                state,
+            )
+            prop_list.append(prop)
+            self._theme_props[name] = prop
+
+        # --- Separator after theme section ---
+        sep2 = IBus.Property.new(
+            "tux-im:sep2",
+            IBus.PropType.SEPARATOR,
+            IBus.Text.new_from_string(""),
+            "",
+            IBus.Text.new_from_string(""),
+            False,
+            False,
+            IBus.PropState.UNCHECKED,
+        )
+        prop_list.append(sep2)
+
+        # --- CN/EN toggle ---
         label = self._input_mode_label()
         state = IBus.PropState.CHECKED if self._chinese_mode else IBus.PropState.UNCHECKED
         log.debug("_build_prop_list: InputMode prop label=%s state=%s", label, state)
