@@ -1,43 +1,3 @@
-tux-im (0.1.0-17) UNRELEASED; urgency=medium
-
-  * fix(theme): remove gsettings from _switch_theme — custom CSS is now
-    loaded via GtkCssProvider so only the IBus panel is affected; other
-    apps (including the settings window) are never changed
-  * fix(settings): add _force_opaque_window() CSS override so the settings
-    panel always uses opaque theme colors regardless of active IBus theme
-  * fix(settings): _on_apply_theme no longer calls gsettings; theme is
-    saved to config and the IBus engine loads CSS via GtkCssProvider
-
- -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
-
-tux-im (0.1.0-16) UNRELEASED; urgency=medium
-
-  * feat(engine): add theme switching in IBus indicator (Top 5: TuxDark,
-    TuxLight, TuxRetro, Frost, Catppuccin) via do_property_activate
-  * feat(engine): _switch_theme() now calls _update_theme_prop_check()
-    to immediately refresh the checkmark after switching
-  * feat(engine): add INDICATOR_THEMES list (Top 5) distinct from
-    full THEMES list; indicator shows Top 5, settings shows all 11
-  * feat(theme): add Nord, Dracula, RosePine GTK3 themes (settings only)
-  * feat(settings): add Nord, Dracula, RosePine to theme selector
-
- -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
-
-tux-im (0.1.0-15) UNRELEASED; urgency=medium
-
-  * feat(config): add candidate_orientation option (default: horizontal)
-  * feat(engine): set LookupTable orientation from config
-  * feat(theme): add TuxDark GTK3 theme (modern dark with electric blue accents)
-  * feat(theme): add TuxLight GTK3 theme (clean white with deep blue accents)
-  * feat(theme): add TuxRetro GTK3 theme (warm parchment with vermilion accents)
-  * feat(settings): add candidate orientation + GTK theme selector
-  * fix(wbpy): pass through 1-5 digits when buffer empty or ends with tone
-  * fix(indicator): show checked state for active input mode in IBus panel
-  * fix(wubi): pass through non-wubi keys (digits, punctuation) instead of
-    swallowing them
-
- -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
-
 tux-im (0.1.0-14) UNRELEASED; urgency=medium
 
   * fix(lexicon): fix user word persistence — user words were lost on
@@ -86,7 +46,6 @@ tux-im (0.1.0-14) UNRELEASED; urgency=medium
 
  -- TUX IM contributors <tux-im@example.com>  Wed, 01 Jul 2026 19:55:00 +0000
 
- -- TUX IM contributors <tux-im@example.com>  Sat, 04 Jul 2026 00:00:00 +0000
 tux-im (0.1.0-12) resolute; urgency=medium
 
   * ci: drop the lint-fix auto-push job.  Main is now ruff-clean

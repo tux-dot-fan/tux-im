@@ -8,75 +8,20 @@ import sys
 import gi
 
 gi.require_version("Gtk", "3.0")
-from gi.repository import Gtk, Gdk
+from gi.repository import Gtk
 
 from tux_im.config.config import Config
 
 log = logging.getLogger(__name__)
 
 MODES = ["pinyin", "wubi", "wbpy"]
-ORIENTATIONS = ["horizontal", "vertical"]
-TUX_THEMES = ["system", "TuxDark", "TuxLight", "TuxRetro",
-                  "Frost", "Forest", "Sunset", "Solarized",
-                  "Catppuccin", "Nord", "Dracula", "RosePine"]
-
-# The config instance used by this settings window process.
-# Updated by _on_apply_theme to persist theme changes.
-_config_for_settings: Config | None = None
-
-
-def _force_opaque_window() -> None:
-    """Override any transparent background on the settings window.
-
-    When a TuxIM custom theme is active via gsettings (set by the indicator
-    switcher), the settings window would otherwise inherit its transparent
-    background.  This CSS forces an opaque background so the settings UI
-    is always readable, regardless of what theme is currently active.
-    """
-    try:
-        css_provider = Gtk.CssProvider()
-        # "!important" overrides any theme's transparent rgba() background.
-        css_provider.load_from_data(
-            b"""
-            @binding-set settings-window-bindings {
-                bind "<Alt>space" { "insert-at-cursor"(" ") }
-            }
-            GtkWindow {
-                background-color: @theme_bg_color !important;
-                color: @theme_fg_color;
-            }
-            GtkLabel {
-                background-color: transparent;
-                color: @theme_fg_color;
-            }
-            GtkButton, GtkComboBox, GtkEntry, GtkGrid, GtkNotebook, GtkBox {
-                background-color: @theme_bg_color;
-                color: @theme_fg_color;
-            }
-            """
-        )
-        screen = Gdk.Screen.get_default()
-        if screen is not None:
-            Gtk.StyleContext.add_provider_for_screen(
-                screen, css_provider,
-                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION + 1,
-            )
-    except Exception as exc:
-        log.warning("_force_opaque_window: %s", exc)
 
 
 class SettingsWindow:
     """A `Gtk.Window` with a notebook of settings tabs."""
 
     def __init__(self, config: Config) -> None:
-        global _config_for_settings
-        _config_for_settings = config
         self._config = config
-
-        # Force the settings window to use opaque theme colors, overriding
-        # any transparent custom IBus themes that may be active via gsettings.
-        _force_opaque_window()
-
         self.win = Gtk.Window(title="TUX IM 设置")
         self.win.set_default_size(560, 420)
         self.win.set_border_width(8)
@@ -187,90 +132,24 @@ class SettingsWindow:
         return _wrap(grid)
 
     def _build_appearance_tab(self) -> Gtk.Box:
-        grid = Gtk.Grid(column_spacing=8, row_spacing=10)
+        grid = Gtk.Grid(column_spacing=8, row_spacing=8)
         grid.set_border_width(16)
 
-        # --- Candidate orientation ---
-        grid.attach(Gtk.Label(label="候选词方向:", xalign=1), 0, 0, 1, 1)
-        self._orient_combo = Gtk.ComboBoxText()
-        for o in ORIENTATIONS:
-            label = {"horizontal": "横向", "vertical": "纵向"}[o]
-            self._orient_combo.append_text(label)
-        idx = ORIENTATIONS.index(self._config.ui.candidate_orientation) \
-            if self._config.ui.candidate_orientation in ORIENTATIONS else 0
-        self._orient_combo.set_active(idx)
-        grid.attach(self._orient_combo, 1, 0, 1, 1)
+        grid.attach(Gtk.Label(label="主题:", xalign=1), 0, 0, 1, 1)
+        self._theme = Gtk.ComboBoxText()
+        for t in ("system", "dark", "light"):
+            self._theme.append_text(t)
+        self._theme.set_active(("system", "dark", "light").index(self._config.ui.theme))
+        grid.attach(self._theme, 1, 0, 1, 1)
 
-        # --- GTK Theme for IBus panel ---
-        grid.attach(Gtk.Label(label="候选框主题:", xalign=1), 0, 1, 1, 1)
-        self._gtk_theme = Gtk.ComboBoxText()
-        for t in TUX_THEMES:
-            label = {
-                "system":      "跟随系统",
-                "TuxDark":    "TuxDark (暗色)",
-                "TuxLight":   "TuxLight (亮色)",
-                "TuxRetro":   "TuxRetro (复古)",
-                "Frost":      "Frost (冰蓝)",
-                "Forest":     "Forest (森林)",
-                "Sunset":     "Sunset (暖橙)",
-                "Solarized":  "Solarized",
-                "Catppuccin": "Catppuccin (紫灰)",
-                "Nord":       "Nord (北极蓝)",
-                "Dracula":    "Dracula (紫红)",
-                "RosePine":   "RosePine (玫瑰粉)",
-            }[t]
-            self._gtk_theme.append_text(label)
-        idx = TUX_THEMES.index(self._config.ui.theme) \
-            if self._config.ui.theme in TUX_THEMES else 0
-        self._gtk_theme.set_active(idx)
-        grid.attach(self._gtk_theme, 1, 1, 1, 1)
-
-        # --- Apply theme button ---
-        self._theme_status = Gtk.Label(label="")
-        self._theme_status.set_halign(Gtk.Align.START)
-        grid.attach(self._theme_status, 1, 2, 1, 1)
-
-        apply_btn = Gtk.Button(label="应用主题")
-        apply_btn.connect("clicked", self._on_apply_theme)
-        grid.attach(apply_btn, 0, 2, 1, 1)
-
-        # --- Info note ---
-        note = Gtk.Label(
-            label="提示: 主题修改后需要重启 IBus 或重新登录才能生效。\n"
-            "候选词方向立即生效，但建议重启 IBus。"
-        )
-        note.set_halign(Gtk.Align.START)
-        note.set_line_wrap(True)
-        note.set_max_width_chars(48)
-        grid.attach(note, 0, 3, 2, 1)
+        grid.attach(Gtk.Label(label="悬浮窗位置:", xalign=1), 0, 1, 1, 1)
+        self._overlay_pos = Gtk.ComboBoxText()
+        for p in ("cursor", "fixed"):
+            self._overlay_pos.append_text(p)
+        self._overlay_pos.set_active(("cursor", "fixed").index(self._config.ui.overlay_position))
+        grid.attach(self._overlay_pos, 1, 1, 1, 1)
 
         return _wrap(grid)
-
-    def _on_apply_theme(self, _btn: object) -> None:
-        """Save the theme to config (IBus picks it up on next focus).
-
-        Theme CSS is loaded via GtkCssProvider in the IBus engine so it only
-        affects the IBus panel — the settings window and other apps are unchanged.
-        """
-        theme_name = TUX_THEMES[self._gtk_theme.get_active()]
-        from dataclasses import replace
-        global _config_for_settings
-        if _config_for_settings is not None:
-            _config_for_settings = replace(
-                _config_for_settings,
-                ui=replace(_config_for_settings.ui, theme=theme_name),
-            )
-            _config_for_settings.save()
-            log.info("_on_apply_theme: saved theme=%s", theme_name)
-
-        if theme_name == "system":
-            self._theme_status.set_label(
-                "已设为跟随系统主题。IBus 将在下次焦点时生效。"
-            )
-        else:
-            self._theme_status.set_label(
-                f"已保存为 {theme_name}。IBus 将在下次焦点时应用新样式。"
-            )
 
     def _build_about_tab(self) -> Gtk.Box:
         from tux_im import __version__
@@ -310,8 +189,8 @@ class SettingsWindow:
         # UI.
         self._config.ui = replace(
             self._config.ui,
-            theme=TUX_THEMES[self._gtk_theme.get_active()],
-            candidate_orientation=ORIENTATIONS[self._orient_combo.get_active()],
+            theme=("system", "dark", "light")[self._theme.get_active()],
+            overlay_position=("cursor", "fixed")[self._overlay_pos.get_active()],
         )
         self._config.save()
         log.info("Config saved to %s", self._config.path)

@@ -93,23 +93,6 @@ class UISection:
     overlay_offset_x: int = 0
     overlay_offset_y: int = 24
     font_size: int = 14
-    # IBus candidate list orientation: "horizontal" (default) or "vertical".
-    # The engine sets LookupTable.set_orientation() accordingly.
-    # Note: this only controls the layout direction; the actual visual
-    # appearance (colors, fonts, shadows) is determined by the GTK3 theme
-    # selected in the system settings.  Tux IM ships bundled themes under
-    # /usr/share/themes/ (TuxDark / TuxLight / TuxRetro).
-    candidate_orientation: str = "horizontal"
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "theme": self.theme,
-            "overlay_position": self.overlay_position,
-            "overlay_offset_x": self.overlay_offset_x,
-            "overlay_offset_y": self.overlay_offset_y,
-            "font_size": self.font_size,
-            "candidate_orientation": self.candidate_orientation,
-        }
 
 
 @dataclass
@@ -192,7 +175,6 @@ class Config:
                 "overlay_offset_x": self.ui.overlay_offset_x,
                 "overlay_offset_y": self.ui.overlay_offset_y,
                 "font_size": self.ui.font_size,
-                "candidate_orientation": self.ui.candidate_orientation,
             },
             "dictionary": {
                 "search_paths": self.dictionary.search_paths,
