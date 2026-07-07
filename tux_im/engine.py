@@ -429,7 +429,23 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
             # an upper-case letter ('C'), not lower-case.  The standard
             # Windows/macOS/Linux behaviour is: CapsLock alone → lower case;
             # CapsLock + Shift → upper case.
-            if state & IBus.ModifierType.LOCK_MASK:
+            # Only handle CapsLock normalisation when NO other application
+            # modifier is held.  CapsLock LED state (LOCK_MASK) is sticky
+            # and stays set across every keypress, so without this guard
+            # the branch would swallow Ctrl-V / Alt-Tab / Super-L etc.
+            # when CapsLock is on, breaking every app shortcut that
+            # happens to involve a letter.
+            non_lock_mods = (
+                IBus.ModifierType.CONTROL_MASK
+                | IBus.ModifierType.MOD1_MASK
+                | IBus.ModifierType.MOD4_MASK
+                | IBus.ModifierType.SUPER_MASK
+                | IBus.ModifierType.HYPER_MASK
+            )
+            if (
+                state & IBus.ModifierType.LOCK_MASK
+                and not (state & non_lock_mods)
+            ):
                 keyname = IBus.keyval_name(keyval)
                 if len(keyname) == 1 and keyname.isalpha():
                     # CapsLock alone → lower case; CapsLock + Shift → upper case.

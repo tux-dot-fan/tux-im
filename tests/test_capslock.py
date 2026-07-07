@@ -162,3 +162,62 @@ def test_capslock_chinese_mode_does_not_normalise(engine: object) -> None:
     result = engine._handle_key(_kv("A"), state)
     # No exception thrown is sufficient — chinese path is exercised.
     assert result in (True, False)
+
+
+def test_capslock_with_ctrl_passes_through_in_latin_mode(engine: object) -> None:
+    """Regression: Ctrl+V with CapsLock ON must NOT commit 'v'.
+
+    The Latin-mode CapsLock normalisation used to swallow every letter
+    keypress whenever the LOCK_MASK was set in the state, regardless of
+    other modifiers.  Since CapsLock is a sticky LED, that meant any
+    Ctrl/Alt/Super + letter combination typed while CapsLock was on was
+    intercepted by the engine and the underlying letter was committed
+    to the focused app, silently breaking Ctrl-C / Ctrl-V / Alt-Tab /
+    Super-L etc.
+
+    The fix: only run the CapsLock normalisation branch when LOCK_MASK
+    is the ONLY non-shift modifier set.
+    """
+    state = (
+        IBus.ModifierType.LOCK_MASK | IBus.ModifierType.CONTROL_MASK
+    )
+    result = engine._handle_key(_kv("v"), state)
+    # Must return False so IBus forwards the Ctrl+V to the focused app.
+    assert result is False, (
+        f"Ctrl+V with CapsLock on must pass through, got result={result!r}"
+    )
+    # And nothing should be committed.
+    assert engine.committed == [], (
+        f"Ctrl+V must not commit any letter, got {engine.committed!r}"
+    )
+
+
+def test_capslock_with_alt_passes_through_in_latin_mode(engine: object) -> None:
+    """Regression: Alt+letter with CapsLock ON must NOT commit the letter."""
+    state = (
+        IBus.ModifierType.LOCK_MASK | IBus.ModifierType.MOD1_MASK
+    )
+    result = engine._handle_key(_kv("c"), state)
+    assert result is False
+    assert engine.committed == []
+
+
+def test_capslock_with_super_passes_through_in_latin_mode(engine: object) -> None:
+    """Regression: Super+letter with CapsLock ON must NOT commit the letter."""
+    state = (
+        IBus.ModifierType.LOCK_MASK | IBus.ModifierType.SUPER_MASK
+    )
+    result = engine._handle_key(_kv("l"), state)
+    assert result is False
+    assert engine.committed == []
+
+
+def test_capslock_alone_still_normalises(engine: object) -> None:
+    """Sanity: the fix must not regress the plain-CapsLock case.
+
+    CapsLock on, no other modifier, letter keyval → lowercase commit.
+    """
+    state = IBus.ModifierType.LOCK_MASK
+    result = engine._handle_key(_kv("A"), state)
+    assert result is True
+    assert engine.committed == ["a"]
