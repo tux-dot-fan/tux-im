@@ -1,3 +1,21 @@
+tux-im (0.1.0-17) UNRELEASED; urgency=medium
+
+  * feat(input): LatinMode passthrough contract — full_sentence() now
+    declares its protocol return type (str | None) instead of None,
+    so mypy --strict stays green.  Adds tests/test_latin.py with 15
+    tests pinning the passthrough contract (letter, space, BackSpace,
+    Ctrl/Alt/Super+letter, buffer immutability, commit=None,
+    candidates=[]).
+  * ci: the .github/workflows/ci.yml file was already present in
+    1dfb63a and has survived every subsequent commit; verified the
+    file is still in HEAD and is identical to the pinned 1dfb63a
+    version.  No change needed — the previous changelog note about
+    "lost between 0.1.0-12 and 0.1.0-16" was based on a misread of
+    the directory listing.  Workflow now ready for the v0.1.0-17
+    tag.
+
+ -- TUX IM contributors <tux-im@example.com>  Fri, 31 Jul 2026 14:54:00 +0000
+
 tux-im (0.1.0-16) UNRELEASED; urgency=medium
 
   * fix(settings): make combo index lookups resilient to unknown config values
