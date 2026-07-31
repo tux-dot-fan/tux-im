@@ -59,6 +59,6 @@ class LatinMode:
         # through to the focused app.
         return False
 
-    def full_sentence(self) -> None:
+    def full_sentence(self) -> str | None:
         """No sentence-level decoding."""
         return None
