@@ -45,12 +45,18 @@ small footprint on modern Linux desktops.
 %autosetup -n tux_im-0.1.0
 
 %build
-# Build wheel into %{_pyproject_wheeldir}; rpmbuild's automatic
-# %pyproject_install step (added by python-rpm-macros for
-# pyproject-based packages) reads from this directory after
-# %build to install into the buildroot.
+echo "DEBUG: entering %build section" >&2
+echo "DEBUG: pyproject_wheeldir=%{_pyproject_wheeldir}" >&2
+echo "DEBUG: pyproject_build_dir=%{_pyproject_build_dir}" >&2
+echo "DEBUG: pwd=$(pwd)" >&2
+echo "DEBUG: ls .:" >&2
+ls . >&2
+mkdir -p %{_pyproject_wheeldir}
 python3 -m pip wheel --no-deps --no-build-isolation \
     --wheel-dir %{_pyproject_wheeldir} .
+echo "DEBUG: wheel dir contents:" >&2
+ls %{_pyproject_wheeldir} >&2
+echo "DEBUG: exiting %build" >&2
 
 %install
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
