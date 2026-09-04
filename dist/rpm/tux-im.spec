@@ -1,4 +1,3 @@
-%global pypi_name tux-im
 %global version 0.1.0
 %global release 17
 
@@ -8,7 +7,7 @@ Release:        %{release}%{?dist}
 Summary:        IBus input method engine for Pinyin, Wubi, Wbpy, and ASR
 License:        GPL-3.0-or-later
 URL:            https://github.com/tux-im/tux-im
-Source0:        https://files.pythonhosted.org/packages/source/t/%{pypi_name}/tux_im-%{version}.tar.gz
+Source0:        https://files.pythonhosted.org/packages/source/t/t/tux_im-%{version}.tar.gz
 BuildArch:      noarch
 
 Requires:       ibus
