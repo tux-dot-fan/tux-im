@@ -45,23 +45,18 @@ small footprint on modern Linux desktops.
 %autosetup -n tux_im-0.1.0
 
 %build
-echo "DEBUG: entering %build section" >&2
-echo "DEBUG: pyproject_wheeldir=%{_pyproject_wheeldir}" >&2
-echo "DEBUG: pyproject_build_dir=%{_pyproject_build_dir}" >&2
-echo "DEBUG: pwd=$(pwd)" >&2
-echo "DEBUG: ls .:" >&2
-ls . >&2
+# Build the wheel into %{_pyproject_wheeldir}; %pyproject_install
+# in the %install section below then copies the wheel into the
+# buildroot, populating %{_bindir}/{ibus-engine-tux-im,tux-im-setup}
+# and %{python3_sitelib}/tux_im/.
 mkdir -p %{_pyproject_wheeldir}
 python3 -m pip wheel --no-deps --no-build-isolation \
     --wheel-dir %{_pyproject_wheeldir} .
-echo "DEBUG: wheel dir contents:" >&2
-ls %{_pyproject_wheeldir} >&2
-echo "DEBUG: exiting %build" >&2
 
 %install
-# %pyproject_install installs the wheel built in %build into the
-# buildroot; this populates %{python3_sitelib}/tux_im/, the
-# dist-info, and %{_bindir}/ibus-engine-tux-im + tux-im-setup.
+# Install the wheel into the buildroot.  Combined with the wheel
+# we built in %build, this populates the script entry points and
+# the Python package files.
 %pyproject_install
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
 install -D -m 0644 setup/com.github.tux-im.TuxIM.xml \
@@ -76,7 +71,6 @@ install -d %{buildroot}%{_datadir}/tux-im
 install -m 0644 data/*.yaml %{buildroot}%{_datadir}/tux-im/
 
 %files
-%license LICENSE
 %doc README.md
 %{_bindir}/ibus-engine-tux-im
 %{_bindir}/tux-im-setup
