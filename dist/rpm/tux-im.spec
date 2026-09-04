@@ -59,6 +59,7 @@ python3 -m pip install --no-deps \
     --no-index --ignore-installed \
     --find-links %{_pyproject_build_dir} %{pypi_name}
 
+%install
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
 install -D -m 0644 setup/com.github.tux-im.TuxIM.xml \
     %{buildroot}%{_datadir}/ibus/component/com.github.tux-im.TuxIM.xml
