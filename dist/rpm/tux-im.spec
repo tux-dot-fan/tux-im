@@ -38,7 +38,11 @@ input) modes. Designed for fast startup, type-safe internals, and a
 small footprint on modern Linux desktops.
 
 %prep
-%autosetup -n %{pypi_name}-%{version}
+# PyPI normalizes the project name from tux-im to tux_im in the
+# sdist tarball, so the actual file is tux_im-0.1.0.tar.gz but
+# extracts to a directory called tux_im-0.1.0.  Use %setup -n
+# with the underscore form so rpmbuild finds the tarball.
+%autosetup -n tux_im-%{version}
 
 %build
 # Build wheel + install into buildroot. %pyproject_* macros are
