@@ -45,27 +45,20 @@ small footprint on modern Linux desktops.
 %autosetup -n tux_im-0.1.0
 
 %build
-# Build the wheel into %{_pyproject_wheeldir}; we install it
-# ourselves in %install below rather than calling
-# %pyproject_install, which in rpm 4.19+ on Fedora replaces the
-# whole %build / %install body with its own macro shell and
-# silently drops any user-written build/install commands.
-echo "===ENTERING BUILD===" >&2
+# Build the wheel into %{_pyproject_wheeldir}; rpm's auto-injection
+# after %build picks the wheel up and installs it into the
+# buildroot, populating %{_bindir}/{ibus-engine-tux-im,tux-im-setup}
+# and %{python3_sitelib}/tux_im/.
+ls .
 mkdir -p %{_pyproject_wheeldir}
 python3 -m pip wheel --no-deps --no-build-isolation \
     --wheel-dir %{_pyproject_wheeldir} .
-echo "===EXITING BUILD===" >&2
+ls %{_pyproject_wheeldir}
 
 %install
-# Install the wheel we built in %build into the buildroot.  This
-# populates %{_bindir}/ibus-engine-tux-im, %{_bindir}/tux-im-setup
-# and %{python3_sitelib}/tux_im/.
-python3 -m pip install --no-deps \
-    --root %{buildroot} --prefix /usr \
-    --no-index --ignore-installed \
-    --find-links %{_pyproject_wheeldir} tux_im==%{version}
-
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
+# Wheel install is handled by rpm's auto-injection (it picks up the
+# wheel from %{_pyproject_wheeldir} populated in %build).
 install -D -m 0644 setup/com.github.tux-im.TuxIM.xml \
     %{buildroot}%{_datadir}/ibus/component/com.github.tux-im.TuxIM.xml
 install -D -m 0644 setup/com.github.tux-im.TuxIM.service \
