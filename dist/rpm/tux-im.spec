@@ -56,9 +56,13 @@ python3 -m pip wheel --no-deps --no-build-isolation \
 ls %{_pyproject_wheeldir}
 
 %install
+# %pyproject_install takes the wheel from %{_pyproject_wheeldir}
+# (built in %build above) and installs it into the buildroot,
+# populating %{_bindir}/{ibus-engine-tux-im,tux-im-setup} and
+# %{python3_sitelib}/tux_im/.
+%pyproject_install
+
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
-# Wheel install is handled by rpm's auto-injection (it picks up the
-# wheel from %{_pyproject_wheeldir} populated in %build).
 install -D -m 0644 setup/com.github.tux-im.TuxIM.xml \
     %{buildroot}%{_datadir}/ibus/component/com.github.tux-im.TuxIM.xml
 install -D -m 0644 setup/com.github.tux-im.TuxIM.service \
