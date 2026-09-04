@@ -78,6 +78,7 @@ install -m 0644 data/*.yaml %{buildroot}%{_datadir}/tux-im/
 %doc README.md
 %{_bindir}/ibus-engine-tux-im
 %{_bindir}/tux-im-setup
+%{_libexecdir}/ibus-engine-tux-im
 %{python3_sitelib}/tux_im/
 %{python3_sitelib}/tux_im-*.dist-info/
 %{_datadir}/ibus/component/com.github.tux-im.TuxIM.xml
