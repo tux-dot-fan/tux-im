@@ -46,18 +46,12 @@ small footprint on modern Linux desktops.
 %autosetup -n tux_im-0.1.0
 
 %build
-# Build wheel + install into the buildroot. We use explicit
-# python3 -m pip invocations instead of the %pyproject_build /
-# %pyproject_install macros because the macro-generated script
-# occasionally hits "fg: no job control" in non-interactive
-# subshells on Fedora's noarch builders (we ship a pure-Python
-# library + three console scripts; no native extension).
+# Build wheel into %{_pyproject_wheeldir}; rpmbuild's automatic
+# %pyproject_install step (added by python-rpm-macros for
+# pyproject-based packages) reads from this directory after
+# %build to install into the buildroot.
 python3 -m pip wheel --no-deps --no-build-isolation \
-    --wheel-dir %{_pyproject_build_dir} .
-python3 -m pip install --no-deps \
-    --root %{buildroot} \
-    --no-index --ignore-installed \
-    --find-links %{_pyproject_build_dir} %{pypi_name}
+    --wheel-dir %{_pyproject_wheeldir} .
 
 %install
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
