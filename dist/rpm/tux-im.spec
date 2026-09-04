@@ -16,11 +16,13 @@ Requires:       python3-gobject
 Requires:       python3-pysounddevice
 Requires:       python3-httpx
 Requires:       python3-tomli-w
-# librime-data-* package names match Fedora/RHEL/opensuse naming.
-# On Fedora these provide the bundled Rime dictionary files that
-# the wubi/pinyin modes require at runtime.  On other RPM-based
-# distros, fall back to the generic rime-data-wubi.
-Requires:       (librime-data-wubi if fedora or rhel)
+# librime-data-wubi and librime-data-luna-pinyin provide the bundled
+# Rime dictionary files that the wubi/pinyin modes require at
+# runtime.  These package names exist on Debian/Ubuntu but not on
+# upstream Fedora.  Marked as Recommends so a `dnf install` works
+# without them; users on Fedora who want wubi/pinyin support need
+# to install librime + rime-data manually or pull these from a
+# third-party repo (e.g. RPM Fusion).
 Recommends:     librime-data-wubi
 Recommends:     librime-data-luna-pinyin
 

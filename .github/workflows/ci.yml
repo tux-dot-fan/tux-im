@@ -197,6 +197,12 @@ jobs:
           path: dist/
 
       - name: Install rpm-build tooling
+        # librime-data-wubi / librime-data-luna-pinyin do not exist
+        # in the Fedora repo — they're a Debian/Ubuntu-only package
+        # name.  Their rpm equivalent (if any) lives in RPM Fusion
+        # or has to be packaged locally, which is out of scope for
+        # this job.  Rime dictionaries are runtime data; the spec
+        # marks them as Recommends so install works on Fedora.
         run: |
           dnf -y install \
             rpm-build \
@@ -205,9 +211,7 @@ jobs:
             python3-setuptools \
             python3-wheel \
             python3-gobject \
-            ibus \
-            librime-data-wubi \
-            librime-data-luna-pinyin
+            ibus
 
       - name: Stage RPM build tree
         # rpmbuild wants a clean working tree under ~/rpmbuild with
