@@ -1,3 +1,4 @@
+%global pypi_name tux-im
 %global version 0.1.0
 %global release 17
 
@@ -7,7 +8,7 @@ Release:        %{release}%{?dist}
 Summary:        IBus input method engine for Pinyin, Wubi, Wbpy, and ASR
 License:        GPL-3.0-or-later
 URL:            https://github.com/tux-im/tux-im
-Source0:        https://files.pythonhosted.org/packages/source/t/t/tux_im-%{version}.tar.gz
+Source0:        https://files.pythonhosted.org/packages/source/t/%{pypi_name}/tux_im-%{version}.tar.gz
 BuildArch:      noarch
 
 Requires:       ibus
@@ -50,9 +51,11 @@ small footprint on modern Linux desktops.
 # %pyproject_install, which in rpm 4.19+ on Fedora replaces the
 # whole %build / %install body with its own macro shell and
 # silently drops any user-written build/install commands.
+echo "===ENTERING BUILD===" >&2
 mkdir -p %{_pyproject_wheeldir}
 python3 -m pip wheel --no-deps --no-build-isolation \
     --wheel-dir %{_pyproject_wheeldir} .
+echo "===EXITING BUILD===" >&2
 
 %install
 # Install the wheel we built in %build into the buildroot.  This
