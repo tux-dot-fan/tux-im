@@ -59,6 +59,10 @@ ls %{_pyproject_wheeldir} >&2
 echo "DEBUG: exiting %build" >&2
 
 %install
+# %pyproject_install installs the wheel built in %build into the
+# buildroot; this populates %{python3_sitelib}/tux_im/, the
+# dist-info, and %{_bindir}/ibus-engine-tux-im + tux-im-setup.
+%pyproject_install
 # IBus component + D-Bus service file (mirrors debian/tux-im.install)
 install -D -m 0644 setup/com.github.tux-im.TuxIM.xml \
     %{buildroot}%{_datadir}/ibus/component/com.github.tux-im.TuxIM.xml
