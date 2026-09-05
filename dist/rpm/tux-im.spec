@@ -12,7 +12,7 @@ BuildArch:      noarch
 
 Requires:       ibus
 Requires:       python3-gobject
-Requires:       python3-pysounddevice
+Requires:       python3-sounddevice
 Requires:       python3-httpx
 Requires:       python3-tomli-w
 # librime-data-wubi and librime-data-luna-pinyin provide the bundled
