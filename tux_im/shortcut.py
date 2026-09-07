@@ -149,12 +149,18 @@ class ShortcutManager:
         self._bindings.clear()
         shortcuts = self._config.shortcuts.as_dict()
         for action, spec in shortcuts.items():
-            try:
-                parsed = parse_shortcut(spec)
-            except ValueError as exc:
-                log.warning("Invalid shortcut %s=%r: %s", action, spec, exc)
-                continue
-            self._bindings.append((parsed, action))
+            # An action can be bound to one or more key specs.  Most actions
+            # are single-key (str), but page_up / page_down are list[str]
+            # so the same action can be triggered by several keys (e.g.
+            # 'plus', 'minus', 'equal', 'bracketleft', 'bracketright').
+            specs = spec if isinstance(spec, list) else [spec]
+            for one in specs:
+                try:
+                    parsed = parse_shortcut(one)
+                except ValueError as exc:
+                    log.warning("Invalid shortcut %s=%r: %s", action, one, exc)
+                    continue
+                self._bindings.append((parsed, action))
         log.debug("Registered %d shortcuts", len(self._bindings))
 
     def handle(self, engine: object, keyval: int, state: int) -> bool:

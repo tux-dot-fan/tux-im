@@ -38,8 +38,8 @@ class ShortcutSection:
     candidate_7: str = "7"
     candidate_8: str = "8"
     candidate_9: str = "9"
-    page_up: str = "bracketleft"
-    page_down: str = "bracketright"
+    page_up: list[str] = field(default_factory=lambda: ["bracketleft", "minus"])
+    page_down: list[str] = field(default_factory=lambda: ["bracketright", "plus", "equal"])
     cycle_mode: str = "<Ctrl><Shift>m"
     toggle_full_width: str = "<Shift>space"
     open_settings: str = "<Ctrl>comma"
@@ -47,7 +47,7 @@ class ShortcutSection:
     delete_left: str = "BackSpace"
     clear_buffer: str = "Escape"
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, str | list[str]]:
         return {
             "toggle_en_cn": self.toggle_en_cn,
             "start_asr": self.start_asr,
@@ -244,6 +244,17 @@ def _merge(dataclass_obj: Any, data: dict[str, Any]) -> Any:
                 log.warning("_merge: field %r expected %r, got None -- ignoring",
                             k, expected_type)
                 continue
+            # Backwards-compat: if the field is list[T] but the config
+            # file gives a single T (the format used before this field
+            # became multi-key), wrap it into a one-element list.
+            if origin in (list, tuple, set, frozenset) and not isinstance(v, origin):
+                if args and isinstance(v, args[0]):
+                    log.debug(
+                        "_merge: field %r wraps single %r value into list",
+                        k, type(v).__name__,
+                    )
+                    valid[k] = [v] if origin is list else origin([v])
+                    continue
             if not isinstance(v, origin):
                 log.warning("_merge: field %r expected %r, got %r (%s) -- ignoring",
                             k, expected_type, v, type(v).__name__)
