@@ -237,6 +237,28 @@ def test_wbpy_punct_empty_buffer_emits_chinese_not_ascii() -> None:
     assert mode.buffer == ""
 
 
+def test_wbpy_punct_slash_emits_dunhao() -> None:
+    """REGRESSION: pressing `/` (slash) in WbpyMode must emit the Chinese
+    enumeration comma `、` (顿号), not fall through to the application.
+
+    Before the fix, the `slash` keysym was missing from
+    google_pinyin_mode._ASCII_TO_CHINESE_KEYSYM, so WbpyMode.feed_key's
+    punctuation branch returned None for `/` and the raw slash went
+    straight to the focused app.  Same bug the user reported for PinyinMode.
+    """
+    pinyin = Trie()
+    wubi = Trie()
+    mode = WbpyMode(pinyin, _FakeConfig)
+    mode.attach_wubi(wubi)
+
+    kv_slash = IBus.keyval_from_name("slash")
+    assert kv_slash != 0, "IBus has no 'slash' keysym"
+    r = mode.feed_key(kv_slash, 0)
+    assert r is not None, "feed_key must NOT return None for /"
+    assert r.handled is True
+    assert r.commit == "、"
+
+
 def test_wbpy_punct_with_buffer_commits_wubi_first_then_chinese() -> None:
     """`kld` + "." should commit the top wubi candidate + "。".
 
