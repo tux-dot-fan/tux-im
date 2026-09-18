@@ -38,6 +38,7 @@ _ASCII_TO_CHINESE = {
     "'": "\u2019",   # ' -> ' (right single quote)
     "\"": "\u201d",  # " -> " (right double quote)
     "/": "\u3001",   # / -> 、 (Chinese enumeration comma, 顿号)
+    "\\": "\u3001",  # \ -> 、 (同上, 反斜杠在 backspace 下方)
 }
 
 # IBus reports punctuation keys by their keysym name (e.g. the "." key is
@@ -58,6 +59,7 @@ _KEYVAL_NAME_TO_ASCII = {
     "bracketright": "]",
     "minus": "-",
     "slash": "/",
+    "backslash": "\\",
     "apostrophe": "'",
     "quotedbl": "\"",
 }

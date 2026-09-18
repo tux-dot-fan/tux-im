@@ -225,6 +225,7 @@ _ASCII_TO_CHINESE_KEYSYM = {
     "apostrophe": "\u2019",
     "quotedbl": "\u201d",
     "slash": "\u3001",  # / -> 、 (Chinese enumeration comma, 顿号)
+    "backslash": "\u3001",  # \ -> 、 (同上)
 }
 
 # Alias for backwards compatibility (some callers use the old name).

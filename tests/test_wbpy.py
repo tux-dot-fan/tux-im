@@ -238,25 +238,28 @@ def test_wbpy_punct_empty_buffer_emits_chinese_not_ascii() -> None:
 
 
 def test_wbpy_punct_slash_emits_dunhao() -> None:
-    """REGRESSION: pressing `/` (slash) in WbpyMode must emit the Chinese
-    enumeration comma `、` (顿号), not fall through to the application.
+    """REGRESSION: pressing `/` (slash) or `\\` (backslash) in WbpyMode
+    must emit the Chinese enumeration comma `、` (顿号), not fall through
+    to the application.
 
-    Before the fix, the `slash` keysym was missing from
-    google_pinyin_mode._ASCII_TO_CHINESE_KEYSYM, so WbpyMode.feed_key's
-    punctuation branch returned None for `/` and the raw slash went
-    straight to the focused app.  Same bug the user reported for PinyinMode.
+    Before the fix, neither the `slash` nor the `backslash` keysym was
+    in google_pinyin_mode._ASCII_TO_CHINESE_KEYSYM, so WbpyMode.feed_key's
+    punctuation branch returned None and the raw key went straight to the
+    focused app.  On a US layout the key right below BackSpace is
+    backslash, so the user reports a missing `、` when typing Chinese.
     """
     pinyin = Trie()
     wubi = Trie()
     mode = WbpyMode(pinyin, _FakeConfig)
     mode.attach_wubi(wubi)
 
-    kv_slash = IBus.keyval_from_name("slash")
-    assert kv_slash != 0, "IBus has no 'slash' keysym"
-    r = mode.feed_key(kv_slash, 0)
-    assert r is not None, "feed_key must NOT return None for /"
-    assert r.handled is True
-    assert r.commit == "、"
+    for keysym in ("slash", "backslash"):
+        kv = IBus.keyval_from_name(keysym)
+        assert kv != 0, f"IBus has no {keysym!r} keysym"
+        r = mode.feed_key(kv, 0)
+        assert r is not None, f"feed_key must NOT return None for {keysym}"
+        assert r.handled is True
+        assert r.commit == "、"
 
 
 def test_wbpy_punct_with_buffer_commits_wubi_first_then_chinese() -> None:

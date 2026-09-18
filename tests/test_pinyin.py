@@ -125,6 +125,7 @@ def test_punctuation_maps_to_chinese() -> None:
         ("apostrophe", "\u2019"),
         ("quotedbl", "\u201d"),
         ("slash", "、"),  # / -> 、 (顿号, Chinese enumeration comma)
+        ("backslash", "、"),  # \ -> 、 (同上, 反斜杠在 backspace 下方)
     ]
     for keysym_name, expected in pairs:
         # Reset between cases so previous commits don't accumulate.
@@ -160,19 +161,23 @@ def test_punctuation_commits_buffer_first() -> None:
 
 
 def test_punctuation_with_empty_buffer_emits_only_punct() -> None:
-    """When there's no pending pinyin, pressing `/` (slash) directly emits
-    the Chinese enumeration comma `、` without committing any candidate.
+    """When there's no pending pinyin, pressing `/` (slash) or `\\`
+    (backslash) directly emits the Chinese enumeration comma `、` without
+    committing any candidate.
 
     Regression: previously `/` fell through to feed_key's `return None`,
     so the slash was sent straight to the focused application.  After
-    the fix, `slash` is recognised as the keysym for `/` and converts.
+    the fix, `slash` and `backslash` are recognised as keysyms for `/`
+    and `\\` and both convert.
     """
     from tux_im.input.lexicon import Trie
 
     trie = Trie()
     mode = PinyinMode(trie, _FakeConfig)
-    assert mode.buffer == ""
-    r = mode.feed_key(IBus.keyval_from_name("slash"), 0)
-    assert r is not None
-    assert r.handled
-    assert r.commit == "、"
+    for keysym in ("slash", "backslash"):
+        mode.reset()
+        assert mode.buffer == ""
+        r = mode.feed_key(IBus.keyval_from_name(keysym), 0)
+        assert r is not None
+        assert r.handled
+        assert r.commit == "、"
