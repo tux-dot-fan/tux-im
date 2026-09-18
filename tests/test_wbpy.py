@@ -237,29 +237,36 @@ def test_wbpy_punct_empty_buffer_emits_chinese_not_ascii() -> None:
     assert mode.buffer == ""
 
 
-def test_wbpy_punct_slash_emits_dunhao() -> None:
+def test_wbpy_punct_slash_emits_fullwidth() -> None:
     """REGRESSION: pressing `/` (slash) or `\\` (backslash) in WbpyMode
-    must emit the Chinese enumeration comma `、` (顿号), not fall through
-    to the application.
+    must convert to fullwidth, not fall through to the application.
 
-    Before the fix, neither the `slash` nor the `backslash` keysym was
-    in google_pinyin_mode._ASCII_TO_CHINESE_KEYSYM, so WbpyMode.feed_key's
-    punctuation branch returned None and the raw key went straight to the
-    focused app.  On a US layout the key right below BackSpace is
-    backslash, so the user reports a missing `、` when typing Chinese.
+    After the Rime-style full-shape table change:
+      `/` (slash) -> `／` (fullwidth slash, Rime first candidate)
+      `\\` (backslash) -> `、` (Chinese enumeration comma)
+    Both must be consumed by feed_key's punctuation branch and
+    committed as the Chinese character.
     """
+    from tux_im.input.lexicon import Trie
+
     pinyin = Trie()
     wubi = Trie()
     mode = WbpyMode(pinyin, _FakeConfig)
     mode.attach_wubi(wubi)
 
-    for keysym in ("slash", "backslash"):
+    cases = [
+        ("slash", "／"),
+        ("backslash", "、"),
+    ]
+    for keysym, expected in cases:
         kv = IBus.keyval_from_name(keysym)
         assert kv != 0, f"IBus has no {keysym!r} keysym"
         r = mode.feed_key(kv, 0)
         assert r is not None, f"feed_key must NOT return None for {keysym}"
         assert r.handled is True
-        assert r.commit == "、"
+        assert r.commit == expected, (
+            f"{keysym}: expected {expected!r}, got {r.commit!r}"
+        )
 
 
 def test_wbpy_punct_with_buffer_commits_wubi_first_then_chinese() -> None:
@@ -293,15 +300,20 @@ def test_wbpy_punct_with_buffer_commits_wubi_first_then_chinese() -> None:
 
 
 def test_wbpy_punct_full_table() -> None:
-    """Spot-check every punctuation mapping on the empty-buffer path."""
+    """Spot-check every punctuation mapping on the empty-buffer path.
+
+    Mirrors rime-prelude/punctuation.yaml full_shape (Rime librime
+    default table) so this engine feels like a familiar Rime/FCITX5
+    setup.
+    """
     pinyin = Trie()
     wubi = Trie()
     mode = WbpyMode(pinyin, _FakeConfig)
     mode.attach_wubi(wubi)
 
     # Maps: IBus keysym name -> expected Chinese output.  These names
-    # must match the keys of google_pinyin_mode._ASCII_TO_CHINESE so
-    # our reuse-import actually pays off.
+    # must match the keys of google_pinyin_mode._ASCII_TO_CHINESE_KEYSYM
+    # so our reuse-import actually pays off.
     cases = [
         ("period", "。"),
         ("comma", "，"),
@@ -313,11 +325,27 @@ def test_wbpy_punct_full_table() -> None:
         ("greater", "》"),
         ("parenleft", "（"),
         ("parenright", "）"),
-        ("bracketleft", "【"),
-        ("bracketright", "】"),
-        ("minus", "—"),
+        ("bracketleft", "「"),
+        ("bracketright", "」"),
+        ("braceleft", "｛"),
+        ("braceright", "｝"),
+        ("minus", "－"),
+        ("plus", "＋"),
+        ("equal", "＝"),
         ("apostrophe", "\u2019"),
         ("quotedbl", "\u201d"),
+        ("slash", "／"),
+        ("backslash", "、"),
+        ("bar", "｜"),
+        ("grave", "｀"),
+        ("asciitilde", "～"),
+        ("at", "＠"),
+        ("numbersign", "＃"),
+        ("dollar", "￥"),
+        ("percent", "％"),
+        ("asciicircum", "……"),
+        ("ampersand", "＆"),
+        ("asterisk", "＊"),
     ]
     for keysym_name, chinese in cases:
         mode.reset()
@@ -333,9 +361,9 @@ def test_wbpy_punct_full_table() -> None:
 
 def test_wbpy_non_punct_non_letter_passes_through() -> None:
     """Escape / arrows / function keys must still be handed back to the
-    IBus engine for the app to process.  Only the 15 punctuation
-    keysyms should be intercepted -- everything else falls through to
-    the existing `return None` path."""
+    IBus engine for the app to process.  Only the punctuation keysyms
+    in the table above should be intercepted -- everything else falls
+    through to the existing `return None` path."""
     pinyin = Trie()
     wubi = Trie()
     mode = WbpyMode(pinyin, _FakeConfig)

@@ -22,6 +22,13 @@ _PINYIN_SEPARATORS = {" ", "'"}  # space and apostrophe split pinyin syllables
 # ASCII punctuation that auto-commits the current buffer AND converts to Chinese.
 # E.g. typing "wo" then "." commits "我。" in one shot.
 _ASCII_TO_CHINESE = {
+    # Rime librime default full_shape punctuation table (mirrors
+    # rime-prelude/punctuation.yaml full_shape so this engine feels like
+    # a familiar Rime/FCITX5 setup).  Each entry takes the *first*
+    # candidate from Rime's multi-choice list -- e.g. `[` outputs 「
+    # (Rime's first choice for `[`) even though Rime itself defaults
+    # to cycling candidates on repeat press.
+    " ": "\u3000",   # 空格 -> 全角空格
     ".": "\u3002",   # . -> 。
     ",": "\uff0c",   # , -> ，
     ";": "\uff1b",   # ; -> ；
@@ -32,19 +39,35 @@ _ASCII_TO_CHINESE = {
     ">": "\u300b",   # > -> 》
     "(": "\uff08",   # ( -> （
     ")": "\uff09",   # ) -> ）
-    "[": "\u3010",   # [ -> 【
-    "]": "\u3011",   # ] -> 】
-    "-": "\u2014",   # - -> — (em dash)
+    "[": "\u300c",   # [ -> 「
+    "]": "\u300d",   # ] -> 」
+    "{": "\uff5b",   # { -> ｛
+    "}": "\uff5d",   # } -> ｝
+    "-": "\uff0d",   # - -> － (全角短横线, Rime default; 之前是 em-dash)
+    "_": "\u2014\u2014",  # _ -> —— (两个 em-dash)
+    "+": "\uff0b",   # + -> ＋
+    "=": "\uff1d",   # = -> ＝
     "'": "\u2019",   # ' -> ' (right single quote)
     "\"": "\u201d",  # " -> " (right double quote)
-    "/": "\u3001",   # / -> 、 (Chinese enumeration comma, 顿号)
-    "\\": "\u3001",  # \ -> 、 (同上, 反斜杠在 backspace 下方)
+    "/": "\uff0f",   # / -> ／ (全角正斜杠)
+    "\\": "\u3001",  # \ -> 、 (Chinese enumeration comma)
+    "|": "\uff5c",   # | -> ｜
+    "`": "\uff40",   # ` -> ｀
+    "~": "\uff5e",   # ~ -> ～
+    "@": "\uff20",   # @ -> ＠
+    "#": "\uff03",   # # -> ＃
+    "$": "\uffe5",   # $ -> ￥
+    "%": "\uff05",   # % -> ％
+    "^": "\u2026\u2026",  # ^ -> …… (省略号)
+    "&": "\uff06",   # & -> ＆
+    "*": "\uff0a",   # * -> ＊
 }
 
 # IBus reports punctuation keys by their keysym name (e.g. the "." key is
 # reported as keyval_name "period", not "."), so we have to map names
 # back to ASCII before looking them up in _ASCII_TO_CHINESE.
 _KEYVAL_NAME_TO_ASCII = {
+    "space": " ",
     "period": ".",
     "comma": ",",
     "semicolon": ";",
@@ -57,9 +80,24 @@ _KEYVAL_NAME_TO_ASCII = {
     "parenright": ")",
     "bracketleft": "[",
     "bracketright": "]",
+    "braceleft": "{",
+    "braceright": "}",
     "minus": "-",
+    "underscore": "_",
+    "plus": "+",
+    "equal": "=",
     "slash": "/",
     "backslash": "\\",
+    "bar": "|",
+    "grave": "`",
+    "asciitilde": "~",
+    "at": "@",
+    "numbersign": "#",
+    "dollar": "$",
+    "percent": "%",
+    "asciicircum": "^",
+    "ampersand": "&",
+    "asterisk": "*",
     "apostrophe": "'",
     "quotedbl": "\"",
 }

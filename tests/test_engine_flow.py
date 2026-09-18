@@ -408,7 +408,12 @@ def test_pinyin_punct_empty_buffer_emits_chinese_not_ascii() -> None:
 
 
 def test_pinyin_punct_empty_buffer_full_table() -> None:
-    """Spot-check every punctuation mapping on the empty-buffer path."""
+    """Spot-check every punctuation mapping on the empty-buffer path.
+
+    Mirrors rime-prelude/punctuation.yaml full_shape (Rime librime
+    default table) so this engine feels like a familiar Rime/FCITX5
+    setup.
+    """
     trie = Trie()
     cfg = _FakeConfig()
     mode = PinyinMode(trie, cfg)
@@ -424,9 +429,9 @@ def test_pinyin_punct_empty_buffer_full_table() -> None:
         (_KV_GREATER, "》"),
         (_KV_PARENLEFT, "（"),
         (_KV_PARENRIGHT, "）"),
-        (_KV_BRACKETLEFT, "【"),
-        (_KV_BRACKETRIGHT, "】"),
-        (_KV_MINUS, "—"),
+        (_KV_BRACKETLEFT, "「"),    # Rime default (was 【)
+        (_KV_BRACKETRIGHT, "」"),   # Rime default (was 】)
+        (_KV_MINUS, "－"),          # Rime default (was em-dash)
         (_KV_APOSTROPHE, "\u2019"),
         (_KV_QUOTEDBL, "\u201d"),
     ]
@@ -448,3 +453,41 @@ def test_pinyin_punct_keysym_name_not_unicode() -> None:
     # ASCII char. This is the exact reason the bug existed.
     from tux_im.input.pinyin import _ASCII_TO_CHINESE
     assert "period" not in _ASCII_TO_CHINESE
+
+
+# ---------------------------------------------------------------------------
+# page_candidates conditional behavior (Rime paging_with_minus_equal)
+# ---------------------------------------------------------------------------
+
+
+def test_page_candidates_no_candidates_returns_false() -> None:
+    """Engine.page_candidates must return False when there are no candidates,
+    so the `-`/`=` keys fall through to the input mode (where they get
+    converted to fullwidth `－`/`＝`).
+
+    This is the engine-level equivalent of rime-prelude's
+    `paging_with_minus_equal` `when: has_menu` clause: page keys only
+    fire when a candidate menu is visible.
+
+    The "with candidates" companion case is harder to test in isolation
+    because page_candidates calls _refresh_preedit() which dispatches
+    through the GObject/IBus.Engine machinery; that path is covered
+    end-to-end by manual IBus restart tests instead.
+    """
+    import tux_im.engine as engine_mod
+
+    eng = engine_mod.TuxEngine.__new__(engine_mod.TuxEngine)
+    eng._initialized = True
+    eng._chinese_mode = True
+    eng._active_mode = PinyinMode(Trie(), _FakeConfig())
+    engine_mod._config = _FakeConfig()
+
+    # No candidates (empty buffer, no trie entries).
+    assert eng._active_mode.candidates() == []
+    # Both page_up and page_down must yield False so the key falls through.
+    assert eng.page_candidates(-1) is False, (
+        "page_candidates(-1) must return False when no candidates"
+    )
+    assert eng.page_candidates(1) is False, (
+        "page_candidates(1) must return False when no candidates"
+    )

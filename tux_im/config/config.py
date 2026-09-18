@@ -39,7 +39,7 @@ class ShortcutSection:
     candidate_8: str = "8"
     candidate_9: str = "9"
     page_up: list[str] = field(default_factory=lambda: ["bracketleft", "minus"])
-    page_down: list[str] = field(default_factory=lambda: ["bracketright", "plus", "equal"])
+    page_down: list[str] = field(default_factory=lambda: ["bracketright", "equal"])
     cycle_mode: str = "<Ctrl><Shift>m"
     toggle_full_width: str = "<Shift>space"
     open_settings: str = "<Ctrl>comma"

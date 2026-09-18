@@ -45,29 +45,38 @@ def test_parse_plus_minus_equal() -> None:
 
 
 def test_page_up_default_includes_minus() -> None:
-    """The default `page_up` binding includes `-` so users can use it for
-    moving to the previous page of candidates."""
+    """The default `page_up` binding includes `-` (Rime-style minus for
+    paging up) so users can use the keyboard shortcut for navigating
+    to the previous page of candidates.
+
+    Following Rime convention (`paging_with_minus_equal` in
+    rime-prelude/key_bindings.yaml), only `minus` is bound to page_up;
+    `plus` is NOT a page key because the Rime-style convention is to
+    let `plus` always emit its fullwidth Chinese equivalent `＋`.
+    """
     section = ShortcutSection()
     assert "minus" in section.page_up
     assert "bracketleft" in section.page_up
 
 
-def test_page_down_default_includes_plus_and_equal() -> None:
-    """The default `page_down` binding includes both `+` (Shift+=) and the
-    bare `=` key so users on a US keyboard can use either spelling."""
+def test_page_down_default_includes_equal() -> None:
+    """The default `page_down` binding includes `=` (Rime-style equal
+    for paging down) but NOT `plus` -- `plus` is reserved for the
+    fullwidth Chinese mapping `＋`, per Rime convention.
+    """
     section = ShortcutSection()
-    assert "plus" in section.page_down
     assert "equal" in section.page_down
     assert "bracketright" in section.page_down
+    assert "plus" not in section.page_down
 
 
 def test_shortcut_manager_routes_all_aliases_to_same_action() -> None:
     """ShortcutManager.rebuild binds every spec in a list to the same action.
 
-    Pressing `+`, `=`, or `]` should all trigger the action registered for
-    `page_down`.  The manager dispatches by key, not by handler; the
-    handler itself is registered separately by the engine, so we just
-    assert the binding was created for each alias.
+    Pressing `[` and `-` should both trigger `page_up`.  Pressing `]`
+    and `=` should both trigger `page_down`.  The manager dispatches by
+    key, not by handler; the handler itself is registered separately by
+    the engine, so we just assert the binding was created for each alias.
     """
     import gi
     gi.require_version("IBus", "1.0")
@@ -77,13 +86,20 @@ def test_shortcut_manager_routes_all_aliases_to_same_action() -> None:
     class _Cfg:
         shortcuts = cfg_section
     mgr = ShortcutManager(_Cfg())  # type: ignore[arg-type]
-    bound_keysyms: dict[str, int] = {}
+    bound: dict[str, set[str]] = {}
     for parsed, action in mgr._bindings:  # type: ignore[attr-defined]
-        if action == "page_down":
-            bound_keysyms[IBus.keyval_name(parsed.keyval) or ""] = parsed.keyval
-    assert "plus" in bound_keysyms
-    assert "equal" in bound_keysyms
-    assert "bracketright" in bound_keysyms
+        bound.setdefault(action, set()).add(
+            IBus.keyval_name(parsed.keyval) or ""
+        )
+    # page_up
+    assert "bracketleft" in bound["page_up"]
+    assert "minus" in bound["page_up"]
+    # page_down
+    assert "bracketright" in bound["page_down"]
+    assert "equal" in bound["page_down"]
+    # plus is NOT a page key in the Rime convention
+    assert "plus" not in bound["page_up"]
+    assert "plus" not in bound["page_down"]
 
 
 def test_merge_wraps_single_string_into_list() -> None:

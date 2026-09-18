@@ -209,6 +209,9 @@ def _get_decoder() -> _Decoder:
 # ── ASCII punctuation → Chinese ───────────────────────────────────────────────
 
 _ASCII_TO_CHINESE_KEYSYM = {
+    # Mirrors rime-prelude/punctuation.yaml full_shape (Rime librime
+    # default).  Each entry takes the first candidate from Rime's list.
+    "space": "\u3000",
     "period": "\u3002",
     "comma": "\uff0c",
     "semicolon": "\uff1b",
@@ -219,13 +222,28 @@ _ASCII_TO_CHINESE_KEYSYM = {
     "greater": "\u300b",
     "parenleft": "\uff08",
     "parenright": "\uff09",
-    "bracketleft": "\u3010",
-    "bracketright": "\u3011",
-    "minus": "\u2014",
+    "bracketleft": "\u300c",
+    "bracketright": "\u300d",
+    "braceleft": "\uff5b",
+    "braceright": "\uff5d",
+    "minus": "\uff0d",
+    "underscore": "\u2014\u2014",
+    "plus": "\uff0b",
+    "equal": "\uff1d",
     "apostrophe": "\u2019",
     "quotedbl": "\u201d",
-    "slash": "\u3001",  # / -> 、 (Chinese enumeration comma, 顿号)
-    "backslash": "\u3001",  # \ -> 、 (同上)
+    "slash": "\uff0f",
+    "backslash": "\u3001",
+    "bar": "\uff5c",
+    "grave": "\uff40",
+    "asciitilde": "\uff5e",
+    "at": "\uff20",
+    "numbersign": "\uff03",
+    "dollar": "\uffe5",
+    "percent": "\uff05",
+    "asciicircum": "\u2026\u2026",
+    "ampersand": "\uff06",
+    "asterisk": "\uff0a",
 }
 
 # Alias for backwards compatibility (some callers use the old name).

@@ -200,6 +200,18 @@ class TuxEngine(IBus.Engine):  # type: ignore[misc]
         if not self._chinese_mode:
             log.debug("page_candidates(%d): not chinese mode, pass-through", direction)
             return False
+        # Rime convention: only consume page keys when a candidate menu is
+        # actually showing.  With no candidates (preedit only, e.g. user is
+        # still typing the first syllable) the -/= key falls through to
+        # the mode so it can be converted to fullwidth punctuation.  See
+        # rime-prelude/key_bindings.yaml `paging_with_minus_equal`:
+        #   when: has_menu, accept: minus, send: Page_Up
+        #   when: has_menu, accept: equal, send: Page_Down
+        cands = self._active_mode.candidates(_config.ime.max_candidates)  # type: ignore[union-attr]
+        if not cands:
+            log.debug("page_candidates(%d): no candidates, fall through to "
+                      "punctuation handling", direction)
+            return False
         self._active_mode.page(direction)
         self._refresh_preedit()
         return True
